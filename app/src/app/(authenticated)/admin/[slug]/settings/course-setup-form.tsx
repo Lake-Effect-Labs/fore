@@ -11,8 +11,8 @@ import {
   getFacilityHoles,
   bulkUpdateHoles,
 } from '@/lib/actions';
-import type { Facility, Hole } from '@/types/b2b';
-import { MapPin, Save, Loader2, Check } from 'lucide-react';
+import type { Facility, PinPlacement } from '@/types/b2b';
+import { MapPin, Save, Loader2, Check, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface CourseSetupFormProps {
   organizationId: string;
@@ -22,6 +22,9 @@ interface HoleData {
   hole_number: number;
   par: number;
   handicap_index: number;
+  yardage: number | null;
+  pin_placement: PinPlacement;
+  notes: string | null;
 }
 
 export function CourseSetupForm({ organizationId }: CourseSetupFormProps) {
@@ -30,6 +33,7 @@ export function CourseSetupForm({ organizationId }: CourseSetupFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [showOptional, setShowOptional] = useState(false);
 
   const [facility, setFacility] = useState<Facility | null>(null);
   const [facilityName, setFacilityName] = useState('');
@@ -55,8 +59,16 @@ export function CourseSetupForm({ organizationId }: CourseSetupFormProps) {
               hole_number: h.hole_number,
               par: h.par,
               handicap_index: h.handicap_index || h.hole_number,
+              yardage: h.yardage,
+              pin_placement: h.pin_placement,
+              notes: h.notes,
             }))
           );
+          // Show optional fields if any have data
+          const hasOptionalData = existingHoles.some(
+            (h) => h.yardage || h.pin_placement || h.notes
+          );
+          setShowOptional(hasOptionalData);
         } else {
           initializeHoles(existingFacility.holes);
         }
@@ -77,6 +89,9 @@ export function CourseSetupForm({ organizationId }: CourseSetupFormProps) {
         hole_number: i,
         par: 4,
         handicap_index: i,
+        yardage: null,
+        pin_placement: null,
+        notes: null,
       });
     }
     setHoles(newHoles);
@@ -89,7 +104,11 @@ export function CourseSetupForm({ organizationId }: CourseSetupFormProps) {
     }
   };
 
-  const updateHole = (holeNumber: number, field: 'par' | 'handicap_index', value: number) => {
+  const updateHole = (
+    holeNumber: number,
+    field: keyof HoleData,
+    value: number | string | null
+  ) => {
     setHoles((prev) =>
       prev.map((h) =>
         h.hole_number === holeNumber ? { ...h, [field]: value } : h
@@ -121,7 +140,7 @@ export function CourseSetupForm({ organizationId }: CourseSetupFormProps) {
 
         if (result.facility) {
           setFacility(result.facility);
-          // Update holes with custom pars/handicaps
+          // Update holes with all data
           await bulkUpdateHoles(result.facility.id, holes);
         }
       } else {
@@ -140,6 +159,7 @@ export function CourseSetupForm({ organizationId }: CourseSetupFormProps) {
   };
 
   const totalPar = holes.reduce((sum, h) => sum + h.par, 0);
+  const totalYardage = holes.reduce((sum, h) => sum + (h.yardage || 0), 0);
 
   if (isLoading) {
     return (
@@ -222,13 +242,39 @@ export function CourseSetupForm({ organizationId }: CourseSetupFormProps) {
           </div>
         )}
 
-        {/* Total Par */}
-        <div className="rounded-lg bg-[#002418] p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[#a8d4c0]">Total Par</span>
-            <span className="text-2xl font-bold text-[#c9a962]">{totalPar}</span>
+        {/* Course Stats */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-lg bg-[#002418] p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-[#a8d4c0]">Total Par</span>
+              <span className="text-2xl font-bold text-[#c9a962]">{totalPar}</span>
+            </div>
           </div>
+          {totalYardage > 0 && (
+            <div className="rounded-lg bg-[#002418] p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[#a8d4c0]">Total Yardage</span>
+                <span className="text-2xl font-bold text-[#c9a962]">
+                  {totalYardage.toLocaleString()}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Toggle Optional Fields */}
+        <button
+          type="button"
+          onClick={() => setShowOptional(!showOptional)}
+          className="flex items-center gap-2 text-sm text-[#c9a962] hover:text-[#e8f5f0]"
+        >
+          {showOptional ? (
+            <ChevronUp className="h-4 w-4" />
+          ) : (
+            <ChevronDown className="h-4 w-4" />
+          )}
+          {showOptional ? 'Hide' : 'Show'} optional fields (yardage, pin placement, notes)
+        </button>
 
         {/* Holes Grid */}
         <div>
@@ -241,7 +287,14 @@ export function CourseSetupForm({ organizationId }: CourseSetupFormProps) {
                 <tr className="border-b border-[#004d35]">
                   <th className="px-2 py-2 text-left text-[#a8d4c0]">Hole</th>
                   <th className="px-2 py-2 text-center text-[#a8d4c0]">Par</th>
-                  <th className="px-2 py-2 text-center text-[#a8d4c0]">Handicap</th>
+                  <th className="px-2 py-2 text-center text-[#a8d4c0]">Hdcp</th>
+                  {showOptional && (
+                    <>
+                      <th className="px-2 py-2 text-center text-[#a8d4c0]">Yards</th>
+                      <th className="px-2 py-2 text-center text-[#a8d4c0]">Pin</th>
+                      <th className="px-2 py-2 text-left text-[#a8d4c0]">Notes</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -274,7 +327,7 @@ export function CourseSetupForm({ organizationId }: CourseSetupFormProps) {
                         onChange={(e) =>
                           updateHole(hole.hole_number, 'handicap_index', parseInt(e.target.value))
                         }
-                        className="w-16 mx-auto block rounded border border-[#004d35] bg-[#002418] px-2 py-1 text-center text-[#e8f5f0] focus:border-[#c9a962] focus:outline-none"
+                        className="w-14 mx-auto block rounded border border-[#004d35] bg-[#002418] px-1 py-1 text-center text-[#e8f5f0] focus:border-[#c9a962] focus:outline-none"
                       >
                         {Array.from({ length: holeCount }, (_, i) => i + 1).map((n) => (
                           <option key={n} value={n}>
@@ -283,6 +336,60 @@ export function CourseSetupForm({ organizationId }: CourseSetupFormProps) {
                         ))}
                       </select>
                     </td>
+                    {showOptional && (
+                      <>
+                        <td className="px-2 py-2">
+                          <input
+                            type="number"
+                            min="50"
+                            max="700"
+                            placeholder="—"
+                            value={hole.yardage || ''}
+                            onChange={(e) =>
+                              updateHole(
+                                hole.hole_number,
+                                'yardage',
+                                e.target.value ? parseInt(e.target.value) : null
+                              )
+                            }
+                            className="w-16 mx-auto block rounded border border-[#004d35] bg-[#002418] px-1 py-1 text-center text-[#e8f5f0] focus:border-[#c9a962] focus:outline-none"
+                          />
+                        </td>
+                        <td className="px-2 py-2">
+                          <select
+                            value={hole.pin_placement || ''}
+                            onChange={(e) =>
+                              updateHole(
+                                hole.hole_number,
+                                'pin_placement',
+                                e.target.value || null
+                              )
+                            }
+                            className="w-20 mx-auto block rounded border border-[#004d35] bg-[#002418] px-1 py-1 text-center text-[#e8f5f0] focus:border-[#c9a962] focus:outline-none"
+                          >
+                            <option value="">—</option>
+                            <option value="front">Front</option>
+                            <option value="middle">Middle</option>
+                            <option value="back">Back</option>
+                          </select>
+                        </td>
+                        <td className="px-2 py-2">
+                          <input
+                            type="text"
+                            placeholder="Hazards, tips..."
+                            value={hole.notes || ''}
+                            onChange={(e) =>
+                              updateHole(
+                                hole.hole_number,
+                                'notes',
+                                e.target.value || null
+                              )
+                            }
+                            className="w-full min-w-[120px] rounded border border-[#004d35] bg-[#002418] px-2 py-1 text-[#e8f5f0] focus:border-[#c9a962] focus:outline-none"
+                          />
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>

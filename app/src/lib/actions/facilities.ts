@@ -282,14 +282,37 @@ export async function setHoleYardage(
 
 export async function bulkUpdateHoles(
   facilityId: string,
-  holes: { hole_number: number; par: number; handicap_index: number }[]
+  holes: {
+    hole_number: number;
+    par: number;
+    handicap_index: number;
+    yardage?: number | null;
+    pin_placement?: 'front' | 'middle' | 'back' | null;
+    notes?: string | null;
+  }[]
 ) {
   const supabase = await createClient();
 
   for (const hole of holes) {
+    const updateData: Record<string, unknown> = {
+      par: hole.par,
+      handicap_index: hole.handicap_index,
+    };
+
+    // Only include optional fields if they're defined
+    if (hole.yardage !== undefined) {
+      updateData.yardage = hole.yardage || null;
+    }
+    if (hole.pin_placement !== undefined) {
+      updateData.pin_placement = hole.pin_placement;
+    }
+    if (hole.notes !== undefined) {
+      updateData.notes = hole.notes || null;
+    }
+
     await supabase
       .from('holes')
-      .update({ par: hole.par, handicap_index: hole.handicap_index })
+      .update(updateData)
       .eq('facility_id', facilityId)
       .eq('hole_number', hole.hole_number);
   }

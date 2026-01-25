@@ -142,12 +142,17 @@ CREATE INDEX idx_tees_facility ON tees(facility_id);
 -- HOLES (Per facility)
 -- ============================================
 
+CREATE TYPE pin_placement AS ENUM ('front', 'middle', 'back');
+
 CREATE TABLE holes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   facility_id UUID NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
   hole_number SMALLINT NOT NULL CHECK (hole_number >= 1 AND hole_number <= 18),
   par SMALLINT NOT NULL CHECK (par >= 3 AND par <= 6),
   handicap_index SMALLINT CHECK (handicap_index >= 1 AND handicap_index <= 18), -- Hole difficulty ranking
+  yardage SMALLINT, -- Default/typical yardage for the hole
+  pin_placement pin_placement, -- Current pin position (front, middle, back)
+  notes TEXT, -- Optional notes about the hole (hazards, tips, etc.)
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   CONSTRAINT unique_hole UNIQUE (facility_id, hole_number)
 );

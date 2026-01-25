@@ -75,12 +75,17 @@ export interface Tee {
   created_at: string;
 }
 
+export type PinPlacement = 'front' | 'middle' | 'back' | null;
+
 export interface Hole {
   id: string;
   facility_id: string;
   hole_number: number;
   par: number;
   handicap_index: number | null;
+  yardage: number | null;
+  pin_placement: PinPlacement;
+  notes: string | null;
   created_at: string;
 }
 
