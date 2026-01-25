@@ -15,21 +15,42 @@ import type { FriendWithProfile } from '@/lib/actions/friends';
 
 type Step = 'format' | 'config' | 'players' | 'review';
 
-const formats: { id: GameFormat; name: string; description: string }[] = [
+const formats: { id: GameFormat; name: string; description: string; players: string }[] = [
+  {
+    id: 'wolf',
+    name: 'Wolf',
+    description: 'Rotating wolf picks a partner or goes alone. High risk, high reward.',
+    players: '4 players',
+  },
   {
     id: 'skins',
     name: 'Skins',
     description: 'Win the hole outright, win the skin. Ties carry over.',
+    players: '2-4 players',
   },
   {
     id: 'nassau',
     name: 'Nassau',
     description: 'Three bets: front 9, back 9, and overall.',
+    players: '2-4 players',
+  },
+  {
+    id: 'best_ball',
+    name: 'Best Ball',
+    description: 'Teams of 2. Best score on each hole counts for your team.',
+    players: '4 players (2v2)',
+  },
+  {
+    id: 'bingo_bango_bongo',
+    name: 'Bingo Bango Bongo',
+    description: '3 points per hole: first on green, closest to pin, first in hole.',
+    players: '2-4 players',
   },
   {
     id: 'match_play',
     name: 'Match Play',
-    description: 'Head-to-head, hole by hole. Best for 2 players.',
+    description: 'Head-to-head, hole by hole. Win or halve each hole.',
+    players: '2 players',
   },
 ];
 
@@ -51,6 +72,16 @@ export default function NewGamePage() {
   const [backNineBet, setBackNineBet] = useState('5');
   const [overallBet, setOverallBet] = useState('5');
   const [matchBet, setMatchBet] = useState('10');
+  // Wolf config
+  const [wolfValue, setWolfValue] = useState('1');
+  const [loneWolfMultiplier, setLoneWolfMultiplier] = useState('2');
+  const [blindWolfMultiplier, setBlindWolfMultiplier] = useState('3');
+  // Best Ball config
+  const [bestBallBet, setBestBallBet] = useState('10');
+  // Bingo Bango Bongo config
+  const [bingoValue, setBingoValue] = useState('1');
+  const [bangoValue, setBangoValue] = useState('1');
+  const [bongoValue, setBongoValue] = useState('1');
 
   // Players state
   const [friends, setFriends] = useState<FriendWithProfile[]>([]);
@@ -101,6 +132,16 @@ export default function NewGamePage() {
       config.overall_bet = parseFloat(overallBet) || 5;
     } else if (format === 'match_play') {
       config.match_bet = parseFloat(matchBet) || 10;
+    } else if (format === 'wolf') {
+      config.wolf_value = parseFloat(wolfValue) || 1;
+      config.lone_wolf_multiplier = parseFloat(loneWolfMultiplier) || 2;
+      config.blind_wolf_multiplier = parseFloat(blindWolfMultiplier) || 3;
+    } else if (format === 'best_ball') {
+      config.best_ball_bet = parseFloat(bestBallBet) || 10;
+    } else if (format === 'bingo_bango_bongo') {
+      config.bingo_value = parseFloat(bingoValue) || 1;
+      config.bango_value = parseFloat(bangoValue) || 1;
+      config.bongo_value = parseFloat(bongoValue) || 1;
     }
 
     const result = await createGame({
@@ -125,6 +166,7 @@ export default function NewGamePage() {
     if (step === 'config') return true;
     if (step === 'players') {
       if (format === 'match_play') return selectedPlayers.length === 1;
+      if (format === 'wolf' || format === 'best_ball') return selectedPlayers.length === 3; // 4 players total including you
       return selectedPlayers.length >= 1;
     }
     return true;
@@ -207,8 +249,13 @@ export default function NewGamePage() {
                     : 'border-[#004d35] hover:border-[#006747]'
                 }`}
               >
-                <div className="font-semibold text-[#e8f5f0]">{f.name}</div>
-                <div className="text-sm text-[#a8d4c0]">{f.description}</div>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-[#e8f5f0]">{f.name}</span>
+                  <span className="text-xs text-[#a8d4c0] bg-[#002418] px-2 py-0.5 rounded-full">
+                    {f.players}
+                  </span>
+                </div>
+                <div className="text-sm text-[#a8d4c0] mt-1">{f.description}</div>
               </button>
             ))}
 
@@ -353,6 +400,148 @@ export default function NewGamePage() {
                 />
               </div>
             )}
+
+            {format === 'wolf' && (
+              <>
+                <div className="rounded-lg bg-[#002418] p-3 text-sm text-[#a8d4c0]">
+                  <p className="font-medium text-[#e8f5f0] mb-1">How Wolf Works:</p>
+                  <p>Each hole, one player is the &quot;wolf&quot; (rotates). After watching tee shots, the wolf picks a partner or goes alone. Wolf team vs. the other 2 players.</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-[#e8f5f0]">
+                    Value per Point ($)
+                  </label>
+                  <Input
+                    className="mt-2"
+                    type="number"
+                    min="0.5"
+                    step="0.5"
+                    value={wolfValue}
+                    onChange={(e) => setWolfValue(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-[#e8f5f0]">
+                    Lone Wolf Multiplier
+                  </label>
+                  <p className="text-xs text-[#a8d4c0] mb-2">When wolf goes alone against all 3</p>
+                  <div className="flex gap-2">
+                    {['2', '3', '4'].map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setLoneWolfMultiplier(m)}
+                        className={`flex-1 rounded-lg border-2 py-2 font-medium transition-colors ${
+                          loneWolfMultiplier === m
+                            ? 'border-[#c9a962] bg-[#004d35] text-[#c9a962]'
+                            : 'border-[#004d35] text-[#a8d4c0] hover:border-[#006747]'
+                        }`}
+                      >
+                        {m}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-[#e8f5f0]">
+                    Blind Wolf Multiplier
+                  </label>
+                  <p className="text-xs text-[#a8d4c0] mb-2">When wolf declares alone before seeing any shots</p>
+                  <div className="flex gap-2">
+                    {['3', '4', '5'].map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setBlindWolfMultiplier(m)}
+                        className={`flex-1 rounded-lg border-2 py-2 font-medium transition-colors ${
+                          blindWolfMultiplier === m
+                            ? 'border-[#c9a962] bg-[#004d35] text-[#c9a962]'
+                            : 'border-[#004d35] text-[#a8d4c0] hover:border-[#006747]'
+                        }`}
+                      >
+                        {m}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {format === 'best_ball' && (
+              <>
+                <div className="rounded-lg bg-[#002418] p-3 text-sm text-[#a8d4c0]">
+                  <p className="font-medium text-[#e8f5f0] mb-1">How Best Ball Works:</p>
+                  <p>Teams of 2. Each player plays their own ball. The best score on each hole counts for your team.</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-[#e8f5f0]">
+                    Team Bet ($)
+                  </label>
+                  <Input
+                    className="mt-2"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={bestBallBet}
+                    onChange={(e) => setBestBallBet(e.target.value)}
+                  />
+                  <p className="text-xs text-[#a8d4c0] mt-1">Winning team takes this from each opponent</p>
+                </div>
+              </>
+            )}
+
+            {format === 'bingo_bango_bongo' && (
+              <>
+                <div className="rounded-lg bg-[#002418] p-3 text-sm text-[#a8d4c0]">
+                  <p className="font-medium text-[#e8f5f0] mb-1">How Bingo Bango Bongo Works:</p>
+                  <p>3 points per hole. <strong>Bingo:</strong> first on green. <strong>Bango:</strong> closest to pin when all balls are on. <strong>Bongo:</strong> first in the hole.</p>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-sm font-medium text-[#e8f5f0]">
+                      Bingo ($)
+                    </label>
+                    <Input
+                      className="mt-2"
+                      type="number"
+                      min="0.5"
+                      step="0.5"
+                      value={bingoValue}
+                      onChange={(e) => setBingoValue(e.target.value)}
+                    />
+                    <p className="text-xs text-[#a8d4c0] mt-1">1st on green</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-[#e8f5f0]">
+                      Bango ($)
+                    </label>
+                    <Input
+                      className="mt-2"
+                      type="number"
+                      min="0.5"
+                      step="0.5"
+                      value={bangoValue}
+                      onChange={(e) => setBangoValue(e.target.value)}
+                    />
+                    <p className="text-xs text-[#a8d4c0] mt-1">Closest to pin</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-[#e8f5f0]">
+                      Bongo ($)
+                    </label>
+                    <Input
+                      className="mt-2"
+                      type="number"
+                      min="0.5"
+                      step="0.5"
+                      value={bongoValue}
+                      onChange={(e) => setBongoValue(e.target.value)}
+                    />
+                    <p className="text-xs text-[#a8d4c0] mt-1">1st in hole</p>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
@@ -364,6 +553,8 @@ export default function NewGamePage() {
             <CardDescription>
               {format === 'match_play'
                 ? 'Add 1 opponent for your match'
+                : format === 'wolf' || format === 'best_ball'
+                ? 'Add 3 players (4 total including you)'
                 : 'Add friends to your game'}
             </CardDescription>
           </CardHeader>
@@ -515,6 +706,36 @@ export default function NewGamePage() {
                   <div className="flex justify-between">
                     <span className="text-[#a8d4c0]">Match Bet</span>
                     <span className="font-medium text-[#c9a962]">${matchBet}</span>
+                  </div>
+                )}
+                {format === 'wolf' && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-[#a8d4c0]">Per Point</span>
+                      <span className="font-medium text-[#c9a962]">${wolfValue}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#a8d4c0]">Lone Wolf</span>
+                      <span className="font-medium text-[#e8f5f0]">{loneWolfMultiplier}x</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#a8d4c0]">Blind Wolf</span>
+                      <span className="font-medium text-[#e8f5f0]">{blindWolfMultiplier}x</span>
+                    </div>
+                  </>
+                )}
+                {format === 'best_ball' && (
+                  <div className="flex justify-between">
+                    <span className="text-[#a8d4c0]">Team Bet</span>
+                    <span className="font-medium text-[#c9a962]">${bestBallBet}</span>
+                  </div>
+                )}
+                {format === 'bingo_bango_bongo' && (
+                  <div className="flex justify-between">
+                    <span className="text-[#a8d4c0]">Points</span>
+                    <span className="font-medium text-[#c9a962]">
+                      ${bingoValue} / ${bangoValue} / ${bongoValue}
+                    </span>
                   </div>
                 )}
               </div>

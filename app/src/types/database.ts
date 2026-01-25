@@ -1,7 +1,7 @@
 // Database types for Fore MVP
 // Matches Supabase schema
 
-export type GameFormat = 'skins' | 'nassau' | 'match_play';
+export type GameFormat = 'skins' | 'nassau' | 'match_play' | 'wolf' | 'best_ball' | 'bingo_bango_bongo';
 export type GameStatus = 'pending' | 'active' | 'completed' | 'cancelled';
 export type InviteStatus = 'pending' | 'accepted' | 'declined';
 export type FriendshipStatus = 'pending' | 'accepted' | 'blocked';
@@ -61,6 +61,16 @@ export interface GameConfig {
   press_after_down: number | null;
   // Match Play config
   match_bet: number | null;
+  // Wolf config
+  wolf_value: number | null;          // Value per point
+  lone_wolf_multiplier: number | null; // Multiplier when wolf goes alone (default 2x)
+  blind_wolf_multiplier: number | null; // Multiplier for blind wolf (default 3x)
+  // Best Ball config
+  best_ball_bet: number | null;       // Bet per team
+  // Bingo Bango Bongo config
+  bingo_value: number | null;         // First on green
+  bango_value: number | null;         // Closest to pin when all on green
+  bongo_value: number | null;         // First in hole
   created_at: string;
 }
 

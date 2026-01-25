@@ -39,14 +39,27 @@ export async function createGame(input: CreateGameInput) {
   // Create game config
   const { error: configError } = await supabase.from('game_configs').insert({
     game_id: game.id,
+    // Skins
     skin_value: input.config.skin_value || null,
     carry_over: input.config.carry_over ?? true,
+    // Nassau
     front_nine_bet: input.config.front_nine_bet || null,
     back_nine_bet: input.config.back_nine_bet || null,
     overall_bet: input.config.overall_bet || null,
     auto_press: input.config.auto_press ?? false,
     press_after_down: input.config.press_after_down || 2,
+    // Match Play
     match_bet: input.config.match_bet || null,
+    // Wolf
+    wolf_value: input.config.wolf_value || null,
+    lone_wolf_multiplier: input.config.lone_wolf_multiplier ?? 2,
+    blind_wolf_multiplier: input.config.blind_wolf_multiplier ?? 3,
+    // Best Ball
+    best_ball_bet: input.config.best_ball_bet || null,
+    // Bingo Bango Bongo
+    bingo_value: input.config.bingo_value || null,
+    bango_value: input.config.bango_value || null,
+    bongo_value: input.config.bongo_value || null,
   });
 
   if (configError) {

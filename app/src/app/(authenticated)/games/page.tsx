@@ -13,6 +13,9 @@ import {
   Trophy,
   Users,
   Target,
+  Zap,
+  UserPlus,
+  Medal,
 } from 'lucide-react';
 import type { GameFormat, GameStatus } from '@/types/database';
 
@@ -20,12 +23,18 @@ const formatLabels: Record<GameFormat, string> = {
   skins: 'Skins',
   nassau: 'Nassau',
   match_play: 'Match Play',
+  wolf: 'Wolf',
+  best_ball: 'Best Ball',
+  bingo_bango_bongo: 'Bingo Bango Bongo',
 };
 
 const formatIcons: Record<GameFormat, typeof Target> = {
   skins: Target,
   nassau: Trophy,
   match_play: Users,
+  wolf: Zap,
+  best_ball: UserPlus,
+  bingo_bango_bongo: Medal,
 };
 
 const statusColors: Record<GameStatus, 'default' | 'warning' | 'success' | 'secondary'> = {
@@ -71,9 +80,20 @@ export default async function GamesPage() {
           <h2 className="mb-4 text-lg font-semibold text-[#e8f5f0]">
             Game Formats
           </h2>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#004d35]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#004d35]">
+                <Zap className="h-5 w-5 text-[#c9a962]" />
+              </div>
+              <div>
+                <h3 className="font-medium text-[#e8f5f0]">Wolf</h3>
+                <p className="text-sm text-[#a8d4c0]">
+                  Rotating wolf picks partner or goes alone. 4 players.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#004d35]">
                 <Target className="h-5 w-5 text-[#c9a962]" />
               </div>
               <div>
@@ -84,7 +104,7 @@ export default async function GamesPage() {
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#004d35]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#004d35]">
                 <Trophy className="h-5 w-5 text-[#c9a962]" />
               </div>
               <div>
@@ -95,7 +115,29 @@ export default async function GamesPage() {
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#004d35]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#004d35]">
+                <UserPlus className="h-5 w-5 text-[#c9a962]" />
+              </div>
+              <div>
+                <h3 className="font-medium text-[#e8f5f0]">Best Ball</h3>
+                <p className="text-sm text-[#a8d4c0]">
+                  Teams of 2. Best score per hole counts. 4 players.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#004d35]">
+                <Medal className="h-5 w-5 text-[#c9a962]" />
+              </div>
+              <div>
+                <h3 className="font-medium text-[#e8f5f0]">Bingo Bango Bongo</h3>
+                <p className="text-sm text-[#a8d4c0]">
+                  3 points per hole: first on, closest, first in.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#004d35]">
                 <Users className="h-5 w-5 text-[#c9a962]" />
               </div>
               <div>
@@ -269,7 +311,7 @@ export default async function GamesPage() {
               No Games Yet
             </h3>
             <p className="mt-2 max-w-sm text-center text-[#a8d4c0]">
-              Start a game of skins, nassau, or match play with your friends.
+              Start a game of wolf, skins, nassau, or best ball with your friends.
             </p>
             <Link href="/games/new" className="mt-6">
               <Button>
