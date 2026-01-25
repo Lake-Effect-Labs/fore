@@ -1,9 +1,10 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { getOrganization, getUserRole, updateOrganization } from '@/lib/actions';
+import { getOrganization, getUserRole } from '@/lib/actions';
 import { ArrowLeft, Building2 } from 'lucide-react';
 import { OrganizationSettingsForm } from './organization-settings-form';
+import { CourseSetupForm } from './course-setup-form';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -57,7 +58,7 @@ export default async function AdminSettingsPage({ params }: PageProps) {
       </div>
 
       {/* Settings Form Card */}
-      <Card>
+      <Card className="mb-8">
         <CardHeader>
           <CardTitle>Organization Details</CardTitle>
           <CardDescription>
@@ -68,6 +69,9 @@ export default async function AdminSettingsPage({ params }: PageProps) {
           <OrganizationSettingsForm organization={org} />
         </CardContent>
       </Card>
+
+      {/* Course Setup */}
+      <CourseSetupForm organizationId={org.id} />
     </div>
   );
 }

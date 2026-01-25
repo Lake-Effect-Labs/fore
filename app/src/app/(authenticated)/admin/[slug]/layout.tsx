@@ -8,8 +8,6 @@ import {
   Calendar,
   Users,
   Settings,
-  MapPin,
-  Clock,
 } from 'lucide-react';
 
 export default function AdminLayout({
@@ -36,16 +34,6 @@ export default function AdminLayout({
       label: 'Events',
       href: `/admin/${slug}/events`,
       icon: Calendar,
-    },
-    {
-      label: 'Courses',
-      href: `/admin/${slug}/courses`,
-      icon: MapPin,
-    },
-    {
-      label: 'Tee Times',
-      href: `/admin/${slug}/tee-times`,
-      icon: Clock,
     },
     {
       label: 'Team',
