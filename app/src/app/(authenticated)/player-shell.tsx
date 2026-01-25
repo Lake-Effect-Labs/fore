@@ -9,6 +9,7 @@ import {
   User,
   Building2,
   ClipboardList,
+  Gamepad2,
 } from 'lucide-react';
 
 interface PlayerShellProps {
@@ -40,6 +41,11 @@ export function PlayerShell({
       href: '/dashboard',
       icon: LayoutDashboard,
       exact: true,
+    },
+    {
+      label: 'Play',
+      href: '/games',
+      icon: Gamepad2,
     },
     {
       label: 'My Leagues',

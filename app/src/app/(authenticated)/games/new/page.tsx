@@ -147,11 +147,11 @@ export default function NewGamePage() {
       {/* Header */}
       <div className="mb-8">
         <Link
-          href="/dashboard"
+          href="/games"
           className="inline-flex items-center text-sm text-[#a8d4c0] hover:text-[#e8f5f0]"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Dashboard
+          Back to Games
         </Link>
         <h1 className="mt-4 text-2xl font-bold text-[#e8f5f0]">New Game</h1>
       </div>
