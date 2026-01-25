@@ -1,0 +1,577 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Avatar } from '@/components/ui/avatar';
+import { createGame, getFriends, searchUsers } from '@/lib/actions';
+import type { GameFormat, Profile } from '@/types/database';
+import { ArrowLeft, ArrowRight, Check, Search, X, Users } from 'lucide-react';
+import { useEffect } from 'react';
+import type { FriendWithProfile } from '@/lib/actions/friends';
+
+type Step = 'format' | 'config' | 'players' | 'review';
+
+const formats: { id: GameFormat; name: string; description: string }[] = [
+  {
+    id: 'skins',
+    name: 'Skins',
+    description: 'Win the hole outright, win the skin. Ties carry over.',
+  },
+  {
+    id: 'nassau',
+    name: 'Nassau',
+    description: 'Three bets: front 9, back 9, and overall.',
+  },
+  {
+    id: 'match_play',
+    name: 'Match Play',
+    description: 'Head-to-head, hole by hole. Best for 2 players.',
+  },
+];
+
+export default function NewGamePage() {
+  const router = useRouter();
+  const [step, setStep] = useState<Step>('format');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Form state
+  const [format, setFormat] = useState<GameFormat | null>(null);
+  const [holes, setHoles] = useState<9 | 18>(18);
+  const [courseName, setCourseName] = useState('');
+
+  // Config state
+  const [skinValue, setSkinValue] = useState('5');
+  const [carryOver, setCarryOver] = useState(true);
+  const [frontNineBet, setFrontNineBet] = useState('5');
+  const [backNineBet, setBackNineBet] = useState('5');
+  const [overallBet, setOverallBet] = useState('5');
+  const [matchBet, setMatchBet] = useState('10');
+
+  // Players state
+  const [friends, setFriends] = useState<FriendWithProfile[]>([]);
+  const [searchResults, setSearchResults] = useState<Profile[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPlayers, setSelectedPlayers] = useState<Profile[]>([]);
+
+  useEffect(() => {
+    getFriends().then(setFriends);
+  }, []);
+
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    if (query.length >= 2) {
+      const results = await searchUsers(query);
+      setSearchResults(results);
+    } else {
+      setSearchResults([]);
+    }
+  };
+
+  const addPlayer = (profile: Profile) => {
+    if (!selectedPlayers.find((p) => p.id === profile.id)) {
+      setSelectedPlayers([...selectedPlayers, profile]);
+    }
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  const removePlayer = (id: string) => {
+    setSelectedPlayers(selectedPlayers.filter((p) => p.id !== id));
+  };
+
+  const handleSubmit = async () => {
+    if (!format) return;
+
+    setIsLoading(true);
+    setError('');
+
+    const config: Record<string, number | boolean | null> = {};
+
+    if (format === 'skins') {
+      config.skin_value = parseFloat(skinValue) || 5;
+      config.carry_over = carryOver;
+    } else if (format === 'nassau') {
+      config.front_nine_bet = parseFloat(frontNineBet) || 5;
+      config.back_nine_bet = parseFloat(backNineBet) || 5;
+      config.overall_bet = parseFloat(overallBet) || 5;
+    } else if (format === 'match_play') {
+      config.match_bet = parseFloat(matchBet) || 10;
+    }
+
+    const result = await createGame({
+      format,
+      holes,
+      course_name: courseName || undefined,
+      player_ids: selectedPlayers.map((p) => p.id),
+      config,
+    });
+
+    setIsLoading(false);
+
+    if (result.error) {
+      setError(result.error);
+    } else if (result.gameId) {
+      router.push(`/games/${result.gameId}`);
+    }
+  };
+
+  const canProceed = () => {
+    if (step === 'format') return format !== null;
+    if (step === 'config') return true;
+    if (step === 'players') {
+      if (format === 'match_play') return selectedPlayers.length === 1;
+      return selectedPlayers.length >= 1;
+    }
+    return true;
+  };
+
+  const nextStep = () => {
+    if (step === 'format') setStep('config');
+    else if (step === 'config') setStep('players');
+    else if (step === 'players') setStep('review');
+  };
+
+  const prevStep = () => {
+    if (step === 'config') setStep('format');
+    else if (step === 'players') setStep('config');
+    else if (step === 'review') setStep('players');
+  };
+
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+      {/* Header */}
+      <div className="mb-8">
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center text-sm text-[#a8d4c0] hover:text-[#e8f5f0]"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Dashboard
+        </Link>
+        <h1 className="mt-4 text-2xl font-bold text-[#e8f5f0]">New Game</h1>
+      </div>
+
+      {/* Progress */}
+      <div className="mb-8 flex items-center justify-between">
+        {['format', 'config', 'players', 'review'].map((s, i) => (
+          <div key={s} className="flex items-center">
+            <div
+              className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
+                step === s
+                  ? 'bg-[#c9a962] text-[#002418]'
+                  : ['format', 'config', 'players', 'review'].indexOf(step) > i
+                  ? 'bg-[#004d35] text-[#c9a962]'
+                  : 'bg-[#003d2a] text-[#a8d4c0]'
+              }`}
+            >
+              {['format', 'config', 'players', 'review'].indexOf(step) > i ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                i + 1
+              )}
+            </div>
+            {i < 3 && (
+              <div
+                className={`h-0.5 w-12 sm:w-20 ${
+                  ['format', 'config', 'players', 'review'].indexOf(step) > i
+                    ? 'bg-[#c9a962]'
+                    : 'bg-[#004d35]'
+                }`}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Step Content */}
+      {step === 'format' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Choose Game Format</CardTitle>
+            <CardDescription>What type of game do you want to play?</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {formats.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setFormat(f.id)}
+                className={`w-full rounded-lg border-2 p-4 text-left transition-colors ${
+                  format === f.id
+                    ? 'border-[#c9a962] bg-[#004d35]'
+                    : 'border-[#004d35] hover:border-[#006747]'
+                }`}
+              >
+                <div className="font-semibold text-[#e8f5f0]">{f.name}</div>
+                <div className="text-sm text-[#a8d4c0]">{f.description}</div>
+              </button>
+            ))}
+
+            <div className="pt-4">
+              <label className="text-sm font-medium text-[#e8f5f0]">
+                Number of Holes
+              </label>
+              <div className="mt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setHoles(9)}
+                  className={`flex-1 rounded-lg border-2 py-3 font-medium transition-colors ${
+                    holes === 9
+                      ? 'border-[#c9a962] bg-[#004d35] text-[#c9a962]'
+                      : 'border-[#004d35] text-[#a8d4c0] hover:border-[#006747]'
+                  }`}
+                >
+                  9 Holes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHoles(18)}
+                  className={`flex-1 rounded-lg border-2 py-3 font-medium transition-colors ${
+                    holes === 18
+                      ? 'border-[#c9a962] bg-[#004d35] text-[#c9a962]'
+                      : 'border-[#004d35] text-[#a8d4c0] hover:border-[#006747]'
+                  }`}
+                >
+                  18 Holes
+                </button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 'config' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Set the Stakes</CardTitle>
+            <CardDescription>Configure your game settings</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div>
+              <label className="text-sm font-medium text-[#e8f5f0]">
+                Course Name (optional)
+              </label>
+              <Input
+                className="mt-2"
+                placeholder="e.g., Pebble Beach"
+                value={courseName}
+                onChange={(e) => setCourseName(e.target.value)}
+              />
+            </div>
+
+            {format === 'skins' && (
+              <>
+                <div>
+                  <label className="text-sm font-medium text-[#e8f5f0]">
+                    Value per Skin ($)
+                  </label>
+                  <Input
+                    className="mt-2"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={skinValue}
+                    onChange={(e) => setSkinValue(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="carryOver"
+                    checked={carryOver}
+                    onChange={(e) => setCarryOver(e.target.checked)}
+                    className="h-4 w-4 rounded border-[#004d35] bg-[#002418] text-[#c9a962] focus:ring-[#c9a962]"
+                  />
+                  <label htmlFor="carryOver" className="text-sm text-[#a8d4c0]">
+                    Carry over ties to next hole
+                  </label>
+                </div>
+              </>
+            )}
+
+            {format === 'nassau' && (
+              <>
+                <div>
+                  <label className="text-sm font-medium text-[#e8f5f0]">
+                    Front 9 Bet ($)
+                  </label>
+                  <Input
+                    className="mt-2"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={frontNineBet}
+                    onChange={(e) => setFrontNineBet(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-[#e8f5f0]">
+                    Back 9 Bet ($)
+                  </label>
+                  <Input
+                    className="mt-2"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={backNineBet}
+                    onChange={(e) => setBackNineBet(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-[#e8f5f0]">
+                    Overall Bet ($)
+                  </label>
+                  <Input
+                    className="mt-2"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={overallBet}
+                    onChange={(e) => setOverallBet(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {format === 'match_play' && (
+              <div>
+                <label className="text-sm font-medium text-[#e8f5f0]">
+                  Match Bet ($)
+                </label>
+                <Input
+                  className="mt-2"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={matchBet}
+                  onChange={(e) => setMatchBet(e.target.value)}
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 'players' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Add Players</CardTitle>
+            <CardDescription>
+              {format === 'match_play'
+                ? 'Add 1 opponent for your match'
+                : 'Add friends to your game'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a8d4c0]" />
+              <Input
+                className="pl-10"
+                placeholder="Search by name or email..."
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+              />
+              {searchResults.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full rounded-lg border border-[#004d35] bg-[#003d2a] shadow-lg">
+                  {searchResults.map((profile) => (
+                    <button
+                      key={profile.id}
+                      type="button"
+                      onClick={() => addPlayer(profile)}
+                      className="flex w-full items-center gap-3 px-4 py-3 hover:bg-[#004d35]"
+                    >
+                      <Avatar
+                        src={profile.avatar_url}
+                        name={profile.full_name || profile.email}
+                        size="sm"
+                      />
+                      <div className="text-left">
+                        <div className="font-medium text-[#e8f5f0]">
+                          {profile.full_name || profile.display_name || 'Golfer'}
+                        </div>
+                        <div className="text-sm text-[#a8d4c0]">{profile.email}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Selected Players */}
+            {selectedPlayers.length > 0 && (
+              <div>
+                <label className="text-sm font-medium text-[#e8f5f0]">
+                  Selected Players
+                </label>
+                <div className="mt-2 space-y-2">
+                  {selectedPlayers.map((player) => (
+                    <div
+                      key={player.id}
+                      className="flex items-center justify-between rounded-lg border border-[#004d35] p-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Avatar
+                          src={player.avatar_url}
+                          name={player.full_name || player.email}
+                          size="sm"
+                        />
+                        <span className="font-medium text-[#e8f5f0]">
+                          {player.full_name || player.display_name || player.email}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removePlayer(player.id)}
+                        className="text-[#a8d4c0] hover:text-red-400"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Friends Quick Add */}
+            {friends.length > 0 && (
+              <div>
+                <label className="text-sm font-medium text-[#e8f5f0]">
+                  Quick Add Friends
+                </label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {friends
+                    .filter((f) => !selectedPlayers.find((p) => p.id === f.friend.id))
+                    .slice(0, 6)
+                    .map((friend) => (
+                      <button
+                        key={friend.id}
+                        type="button"
+                        onClick={() => addPlayer(friend.friend)}
+                        className="flex items-center gap-2 rounded-full border border-[#004d35] px-3 py-1.5 text-sm text-[#a8d4c0] hover:border-[#c9a962] hover:bg-[#004d35]"
+                      >
+                        <Avatar
+                          src={friend.friend.avatar_url}
+                          name={friend.friend.full_name || friend.friend.email}
+                          size="sm"
+                        />
+                        <span>
+                          {friend.friend.display_name || friend.friend.full_name || 'Friend'}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 'review' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Review & Create</CardTitle>
+            <CardDescription>Make sure everything looks right</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg bg-[#002418] p-4 border border-[#004d35]">
+              <div className="grid gap-3">
+                <div className="flex justify-between">
+                  <span className="text-[#a8d4c0]">Format</span>
+                  <span className="font-medium text-[#e8f5f0]">
+                    {formats.find((f) => f.id === format)?.name}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#a8d4c0]">Holes</span>
+                  <span className="font-medium text-[#e8f5f0]">{holes}</span>
+                </div>
+                {courseName && (
+                  <div className="flex justify-between">
+                    <span className="text-[#a8d4c0]">Course</span>
+                    <span className="font-medium text-[#e8f5f0]">{courseName}</span>
+                  </div>
+                )}
+                {format === 'skins' && (
+                  <div className="flex justify-between">
+                    <span className="text-[#a8d4c0]">Per Skin</span>
+                    <span className="font-medium text-[#c9a962]">${skinValue}</span>
+                  </div>
+                )}
+                {format === 'nassau' && (
+                  <div className="flex justify-between">
+                    <span className="text-[#a8d4c0]">Bets</span>
+                    <span className="font-medium text-[#c9a962]">
+                      ${frontNineBet} / ${backNineBet} / ${overallBet}
+                    </span>
+                  </div>
+                )}
+                {format === 'match_play' && (
+                  <div className="flex justify-between">
+                    <span className="text-[#a8d4c0]">Match Bet</span>
+                    <span className="font-medium text-[#c9a962]">${matchBet}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-[#e8f5f0]">
+                Players ({selectedPlayers.length + 1} including you)
+              </label>
+              <div className="mt-2 flex items-center gap-2">
+                <Users className="h-4 w-4 text-[#a8d4c0]" />
+                <span className="text-[#a8d4c0]">
+                  You
+                  {selectedPlayers.length > 0 && (
+                    <>
+                      {' + '}
+                      {selectedPlayers
+                        .map((p) => p.display_name || p.full_name || 'Player')
+                        .join(', ')}
+                    </>
+                  )}
+                </span>
+              </div>
+            </div>
+
+            {error && (
+              <div className="rounded-lg bg-red-900/20 p-3 text-sm text-red-400">
+                {error}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Navigation */}
+      <div className="mt-6 flex justify-between">
+        {step !== 'format' ? (
+          <Button variant="outline" onClick={prevStep}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+        ) : (
+          <div />
+        )}
+
+        {step !== 'review' ? (
+          <Button onClick={nextStep} disabled={!canProceed()}>
+            Continue
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        ) : (
+          <Button onClick={handleSubmit} isLoading={isLoading}>
+            Create Game
+            <Check className="ml-2 h-4 w-4" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
