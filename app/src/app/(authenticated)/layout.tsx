@@ -10,8 +10,8 @@ export default async function AuthenticatedLayout({
   const headersList = await headers();
   const pathname = headersList.get('x-pathname') || '';
 
-  // Check if we're in the admin section (admin pages have their own layout with sidebar)
-  const isAdminRoute = pathname.startsWith('/admin/') && pathname.split('/').length > 2;
+  // Check if we're in the admin section - all /admin routes use their own layout
+  const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
 
   // Skip shell for admin routes since they have their own sidebar
   if (isAdminRoute) {
