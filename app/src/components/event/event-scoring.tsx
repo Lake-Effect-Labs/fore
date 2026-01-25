@@ -10,7 +10,14 @@ import { Check, Loader2, RefreshCw } from 'lucide-react';
 interface EventScoringProps {
   eventId: string;
   registrationId: string;
-  holes: { hole_number: number; par: number }[];
+  holes: {
+    hole_number: number;
+    par: number;
+    yardage?: number | null;
+    handicap_index?: number | null;
+    pin_placement?: 'front' | 'middle' | 'back' | null;
+    notes?: string | null;
+  }[];
   initialScores: Record<number, number>;
 }
 

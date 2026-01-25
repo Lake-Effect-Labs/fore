@@ -10,7 +10,14 @@ import { Check, Loader2 } from 'lucide-react';
 interface LeagueRoundScoringProps {
   roundId: string;
   participantId: string;
-  holes: { hole_number: number; par: number }[];
+  holes: {
+    hole_number: number;
+    par: number;
+    yardage?: number | null;
+    handicap_index?: number | null;
+    pin_placement?: 'front' | 'middle' | 'back' | null;
+    notes?: string | null;
+  }[];
   initialScores: Record<number, number>;
   leagueId: string;
   seasonId: string;

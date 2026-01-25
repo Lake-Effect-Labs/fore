@@ -38,13 +38,24 @@ export default async function EventScoringPage({ params }: PageProps) {
   }
 
   // Get hole data (if facility is set)
-  let holes: { hole_number: number; par: number }[] = [];
+  let holes: {
+    hole_number: number;
+    par: number;
+    yardage?: number | null;
+    handicap_index?: number | null;
+    pin_placement?: 'front' | 'middle' | 'back' | null;
+    notes?: string | null;
+  }[] = [];
 
   if (event.facility_id) {
     const facilityHoles = await getFacilityHoles(event.facility_id);
     holes = facilityHoles.map(h => ({
       hole_number: h.hole_number,
       par: h.par,
+      yardage: h.yardage,
+      handicap_index: h.handicap_index,
+      pin_placement: h.pin_placement,
+      notes: h.notes,
     }));
   } else {
     // Default holes based on event settings or 18

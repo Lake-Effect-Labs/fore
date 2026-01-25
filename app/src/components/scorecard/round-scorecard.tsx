@@ -5,11 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ParScoreInput } from './par-score-input';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Flag, Trophy } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Flag, Trophy, Info, MapPin } from 'lucide-react';
 
 interface HoleData {
   hole_number: number;
   par: number;
+  yardage?: number | null;
+  handicap_index?: number | null;
+  pin_placement?: 'front' | 'middle' | 'back' | null;
+  notes?: string | null;
 }
 
 interface RoundScorecardProps {
@@ -21,6 +25,12 @@ interface RoundScorecardProps {
   showTotals?: boolean;
 }
 
+const pinLabels = {
+  front: 'Front',
+  middle: 'Middle',
+  back: 'Back',
+};
+
 export function RoundScorecard({
   holes,
   scores,
@@ -31,6 +41,7 @@ export function RoundScorecard({
 }: RoundScorecardProps) {
   const [currentHoleIndex, setCurrentHoleIndex] = useState(0);
   const [pendingHoles, setPendingHoles] = useState<Set<number>>(new Set());
+  const [showNotes, setShowNotes] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const currentHole = holes[currentHoleIndex];
@@ -60,18 +71,24 @@ export function RoundScorecard({
   const goToPrevHole = () => {
     if (currentHoleIndex > 0) {
       setCurrentHoleIndex(currentHoleIndex - 1);
+      setShowNotes(false);
     }
   };
 
   const goToNextHole = () => {
     if (currentHoleIndex < totalHoles - 1) {
       setCurrentHoleIndex(currentHoleIndex + 1);
+      setShowNotes(false);
     }
   };
 
   // Group holes into front 9 and back 9
   const frontNine = holes.filter(h => h.hole_number <= 9);
   const backNine = holes.filter(h => h.hole_number > 9);
+
+  // Check if any hole has course info
+  const hasYardage = holes.some(h => h.yardage);
+  const hasHandicap = holes.some(h => h.handicap_index);
 
   return (
     <div className="space-y-4">
@@ -91,8 +108,49 @@ export function RoundScorecard({
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Hole info bar */}
+          <div className="flex items-center justify-center gap-4 text-sm text-[#a8d4c0] mb-2">
+            {currentHole.yardage && (
+              <span className="flex items-center gap-1">
+                <span className="font-semibold text-[#e8f5f0]">{currentHole.yardage}</span>
+                <span className="text-xs">yds</span>
+              </span>
+            )}
+            {currentHole.handicap_index && (
+              <span className="flex items-center gap-1">
+                <span className="text-xs">Hdcp</span>
+                <span className="font-semibold text-[#e8f5f0]">{currentHole.handicap_index}</span>
+              </span>
+            )}
+            {currentHole.pin_placement && (
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                <span>{pinLabels[currentHole.pin_placement]}</span>
+              </span>
+            )}
+            {currentHole.notes && (
+              <button
+                onClick={() => setShowNotes(!showNotes)}
+                className={cn(
+                  "flex items-center gap-1 transition-colors",
+                  showNotes ? "text-[#c9a962]" : "hover:text-[#e8f5f0]"
+                )}
+              >
+                <Info className="h-3 w-3" />
+                <span className="text-xs">Tips</span>
+              </button>
+            )}
+          </div>
+
+          {/* Notes tooltip */}
+          {showNotes && currentHole.notes && (
+            <div className="mb-4 mx-4 p-3 rounded-lg bg-[#002418] border border-[#004d35] text-sm text-[#a8d4c0]">
+              {currentHole.notes}
+            </div>
+          )}
+
           {/* Current hole - large display */}
-          <div className="flex items-center justify-center gap-4 py-6">
+          <div className="flex items-center justify-center gap-4 py-4">
             <Button
               variant="ghost"
               size="icon"
@@ -130,7 +188,10 @@ export function RoundScorecard({
             {holes.map((hole, index) => (
               <button
                 key={hole.hole_number}
-                onClick={() => setCurrentHoleIndex(index)}
+                onClick={() => {
+                  setCurrentHoleIndex(index);
+                  setShowNotes(false);
+                }}
                 className={cn(
                   'h-2 w-2 rounded-full transition-all',
                   index === currentHoleIndex
@@ -157,71 +218,153 @@ export function RoundScorecard({
           {/* Front 9 */}
           <div className="mb-2">
             <div className="text-xs text-[#a8d4c0] mb-1 px-1">Front 9</div>
-            <div className="grid grid-cols-9 gap-1">
-              {frontNine.map((hole) => {
-                const score = scores[hole.hole_number];
-                const relative = score !== undefined ? score - hole.par : null;
-                return (
-                  <button
-                    key={hole.hole_number}
-                    onClick={() => setCurrentHoleIndex(holes.findIndex(h => h.hole_number === hole.hole_number))}
-                    className={cn(
-                      'flex flex-col items-center justify-center rounded p-1 transition-all',
-                      'border border-[#004d35]',
-                      currentHoleIndex === holes.findIndex(h => h.hole_number === hole.hole_number)
-                        ? 'bg-[#004d35] border-[#c9a962]'
-                        : 'bg-[#003d2a] hover:bg-[#004d35]'
-                    )}
-                  >
-                    <span className="text-[10px] text-[#a8d4c0]">{hole.hole_number}</span>
-                    <span className={cn(
-                      'text-sm font-bold',
-                      score === undefined ? 'text-[#a8d4c0]/40' :
-                      relative !== null && relative < 0 ? 'text-red-400' :
-                      relative === 0 ? 'text-[#e8f5f0]' :
-                      'text-[#a8d4c0]'
-                    )}>
-                      {score ?? '-'}
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[320px]">
+                <thead>
+                  <tr className="text-[10px] text-[#a8d4c0]">
+                    <td className="px-1 text-center">Hole</td>
+                    {frontNine.map(h => (
+                      <td key={h.hole_number} className="px-1 text-center">{h.hole_number}</td>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {hasYardage && (
+                    <tr className="text-[10px] text-[#a8d4c0]">
+                      <td className="px-1 text-center">Yds</td>
+                      {frontNine.map(h => (
+                        <td key={h.hole_number} className="px-1 text-center">
+                          {h.yardage || '-'}
+                        </td>
+                      ))}
+                    </tr>
+                  )}
+                  {hasHandicap && (
+                    <tr className="text-[10px] text-[#a8d4c0]">
+                      <td className="px-1 text-center">Hcp</td>
+                      {frontNine.map(h => (
+                        <td key={h.hole_number} className="px-1 text-center">
+                          {h.handicap_index || '-'}
+                        </td>
+                      ))}
+                    </tr>
+                  )}
+                  <tr className="text-[10px] text-[#c9a962]">
+                    <td className="px-1 text-center">Par</td>
+                    {frontNine.map(h => (
+                      <td key={h.hole_number} className="px-1 text-center font-medium">
+                        {h.par}
+                      </td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td className="px-1 text-center text-[10px] text-[#a8d4c0]">Score</td>
+                    {frontNine.map(h => {
+                      const score = scores[h.hole_number];
+                      const relative = score !== undefined ? score - h.par : null;
+                      return (
+                        <td key={h.hole_number} className="px-1">
+                          <button
+                            onClick={() => {
+                              setCurrentHoleIndex(holes.findIndex(hole => hole.hole_number === h.hole_number));
+                              setShowNotes(false);
+                            }}
+                            className={cn(
+                              'w-full py-1 rounded text-sm font-bold transition-all',
+                              currentHoleIndex === holes.findIndex(hole => hole.hole_number === h.hole_number)
+                                ? 'bg-[#004d35] ring-1 ring-[#c9a962]'
+                                : 'hover:bg-[#004d35]',
+                              score === undefined ? 'text-[#a8d4c0]/40' :
+                              relative !== null && relative < 0 ? 'text-red-400' :
+                              relative !== null && relative > 0 ? 'text-sky-400' :
+                              'text-[#e8f5f0]'
+                            )}
+                          >
+                            {score ?? '-'}
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
           {/* Back 9 */}
           {backNine.length > 0 && (
-            <div>
+            <div className="mt-3 pt-3 border-t border-[#004d35]">
               <div className="text-xs text-[#a8d4c0] mb-1 px-1">Back 9</div>
-              <div className="grid grid-cols-9 gap-1">
-                {backNine.map((hole) => {
-                  const score = scores[hole.hole_number];
-                  const relative = score !== undefined ? score - hole.par : null;
-                  return (
-                    <button
-                      key={hole.hole_number}
-                      onClick={() => setCurrentHoleIndex(holes.findIndex(h => h.hole_number === hole.hole_number))}
-                      className={cn(
-                        'flex flex-col items-center justify-center rounded p-1 transition-all',
-                        'border border-[#004d35]',
-                        currentHoleIndex === holes.findIndex(h => h.hole_number === hole.hole_number)
-                          ? 'bg-[#004d35] border-[#c9a962]'
-                          : 'bg-[#003d2a] hover:bg-[#004d35]'
-                      )}
-                    >
-                      <span className="text-[10px] text-[#a8d4c0]">{hole.hole_number}</span>
-                      <span className={cn(
-                        'text-sm font-bold',
-                        score === undefined ? 'text-[#a8d4c0]/40' :
-                        relative !== null && relative < 0 ? 'text-red-400' :
-                        relative === 0 ? 'text-[#e8f5f0]' :
-                        'text-[#a8d4c0]'
-                      )}>
-                        {score ?? '-'}
-                      </span>
-                    </button>
-                  );
-                })}
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[320px]">
+                  <thead>
+                    <tr className="text-[10px] text-[#a8d4c0]">
+                      <td className="px-1 text-center">Hole</td>
+                      {backNine.map(h => (
+                        <td key={h.hole_number} className="px-1 text-center">{h.hole_number}</td>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {hasYardage && (
+                      <tr className="text-[10px] text-[#a8d4c0]">
+                        <td className="px-1 text-center">Yds</td>
+                        {backNine.map(h => (
+                          <td key={h.hole_number} className="px-1 text-center">
+                            {h.yardage || '-'}
+                          </td>
+                        ))}
+                      </tr>
+                    )}
+                    {hasHandicap && (
+                      <tr className="text-[10px] text-[#a8d4c0]">
+                        <td className="px-1 text-center">Hcp</td>
+                        {backNine.map(h => (
+                          <td key={h.hole_number} className="px-1 text-center">
+                            {h.handicap_index || '-'}
+                          </td>
+                        ))}
+                      </tr>
+                    )}
+                    <tr className="text-[10px] text-[#c9a962]">
+                      <td className="px-1 text-center">Par</td>
+                      {backNine.map(h => (
+                        <td key={h.hole_number} className="px-1 text-center font-medium">
+                          {h.par}
+                        </td>
+                      ))}
+                    </tr>
+                    <tr>
+                      <td className="px-1 text-center text-[10px] text-[#a8d4c0]">Score</td>
+                      {backNine.map(h => {
+                        const score = scores[h.hole_number];
+                        const relative = score !== undefined ? score - h.par : null;
+                        return (
+                          <td key={h.hole_number} className="px-1">
+                            <button
+                              onClick={() => {
+                                setCurrentHoleIndex(holes.findIndex(hole => hole.hole_number === h.hole_number));
+                                setShowNotes(false);
+                              }}
+                              className={cn(
+                                'w-full py-1 rounded text-sm font-bold transition-all',
+                                currentHoleIndex === holes.findIndex(hole => hole.hole_number === h.hole_number)
+                                  ? 'bg-[#004d35] ring-1 ring-[#c9a962]'
+                                  : 'hover:bg-[#004d35]',
+                                score === undefined ? 'text-[#a8d4c0]/40' :
+                                relative !== null && relative < 0 ? 'text-red-400' :
+                                relative !== null && relative > 0 ? 'text-sky-400' :
+                                'text-[#e8f5f0]'
+                              )}
+                            >
+                              {score ?? '-'}
+                            </button>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -241,7 +384,7 @@ export function RoundScorecard({
                 </div>
                 <div className={cn(
                   'text-xs',
-                  relativeToPar < 0 ? 'text-red-400' : relativeToPar === 0 ? 'text-[#a8d4c0]' : 'text-[#a8d4c0]'
+                  relativeToPar < 0 ? 'text-red-400' : relativeToPar === 0 ? 'text-[#a8d4c0]' : 'text-sky-400'
                 )}>
                   {holesPlayed > 0 ? (
                     relativeToPar === 0 ? 'Even' : relativeToPar > 0 ? `+${relativeToPar}` : relativeToPar
