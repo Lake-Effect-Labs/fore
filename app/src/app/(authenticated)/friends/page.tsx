@@ -24,6 +24,11 @@ import {
   Users,
   Clock,
   Trash2,
+  Link2,
+  Copy,
+  Share2,
+  Mail,
+  MessageCircle,
 } from 'lucide-react';
 
 export default function FriendsPage() {
@@ -36,6 +41,64 @@ export default function FriendsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [sendingRequest, setSendingRequest] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  // Get the invite link - just the signup page for now
+  const inviteLink = typeof window !== 'undefined'
+    ? `${window.location.origin}/auth`
+    : '';
+
+  const copyInviteLink = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = inviteLink;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const shareInvite = async () => {
+    const shareData = {
+      title: 'Join me on Fore!',
+      text: 'Join me on Fore to play golf games, join leagues, and track our rounds together!',
+      url: inviteLink,
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        // User cancelled or share failed, fall back to copy
+        copyInviteLink();
+      }
+    } else {
+      copyInviteLink();
+    }
+  };
+
+  const shareViaEmail = () => {
+    const subject = encodeURIComponent('Join me on Fore!');
+    const body = encodeURIComponent(
+      `Hey! I've been using Fore to play golf games with friends and track our rounds. You should join!\n\nSign up here: ${inviteLink}`
+    );
+    window.open(`mailto:?subject=${subject}&body=${body}`);
+  };
+
+  const shareViaSMS = () => {
+    const message = encodeURIComponent(
+      `Join me on Fore to play golf games together! Sign up: ${inviteLink}`
+    );
+    window.open(`sms:?body=${message}`);
+  };
 
   const loadData = async () => {
     const [friendsData, pendingData] = await Promise.all([
@@ -156,6 +219,80 @@ export default function FriendsPage() {
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Invite Friends */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Link2 className="h-5 w-5 text-[#c9a962]" />
+            Invite Friends to Fore
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4 text-sm text-[#a8d4c0]">
+            Know someone who isn't on Fore yet? Share your invite link and play together!
+          </p>
+
+          {/* Invite Link */}
+          <div className="flex items-center gap-2 rounded-lg border border-[#004d35] bg-[#002418] p-3">
+            <input
+              type="text"
+              readOnly
+              value={inviteLink}
+              className="flex-1 bg-transparent text-sm text-[#e8f5f0] outline-none"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyInviteLink}
+              className="shrink-0"
+            >
+              {copied ? (
+                <>
+                  <Check className="mr-2 h-4 w-4 text-green-400" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Share Options */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={shareInvite}
+              className="flex-1 sm:flex-none"
+            >
+              <Share2 className="mr-2 h-4 w-4" />
+              Share
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={shareViaEmail}
+              className="flex-1 sm:flex-none"
+            >
+              <Mail className="mr-2 h-4 w-4" />
+              Email
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={shareViaSMS}
+              className="flex-1 sm:flex-none"
+            >
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Text
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
