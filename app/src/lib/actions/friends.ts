@@ -192,11 +192,22 @@ export async function searchUsers(query: string): Promise<Profile[]> {
 
   if (!user || query.length < 2) return [];
 
+  // Normalize phone number search - strip non-digits for matching
+  const normalizedQuery = query.replace(/\D/g, '');
+  const isPhoneSearch = normalizedQuery.length >= 3 && /^\d+$/.test(query.replace(/[\s\-\(\)\.]/g, ''));
+
+  let orFilter = `email.ilike.%${query}%,full_name.ilike.%${query}%,display_name.ilike.%${query}%`;
+
+  // Add phone search if query looks like a phone number
+  if (isPhoneSearch) {
+    orFilter += `,phone.ilike.%${normalizedQuery}%`;
+  }
+
   const { data: profiles } = await supabase
     .from('profiles')
     .select('*')
     .neq('id', user.id)
-    .or(`email.ilike.%${query}%,full_name.ilike.%${query}%,display_name.ilike.%${query}%`)
+    .or(orFilter)
     .limit(10);
 
   return profiles || [];

@@ -17,6 +17,7 @@ export interface Profile {
   email: string;
   full_name: string | null;
   display_name: string | null;
+  phone: string | null;
   avatar_url: string | null;
   handicap: number | null;
   account_type: AccountType;

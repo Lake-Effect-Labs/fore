@@ -169,7 +169,7 @@ export default function FriendsPage() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a8d4c0]" />
             <Input
               className="pl-10"
-              placeholder="Search by name or email..."
+              placeholder="Search by name, email, or phone..."
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
             />
