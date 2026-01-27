@@ -125,19 +125,19 @@ export async function getFriends(): Promise<FriendWithProfile[]> {
 
   if (!user) return [];
 
-  // Get friendships where user is requester
-  const { data: asRequester } = await supabase
-    .from('friendships')
-    .select('*, friend:profiles!friendships_addressee_id_fkey(*)')
-    .eq('requester_id', user.id)
-    .eq('status', 'accepted');
-
-  // Get friendships where user is addressee
-  const { data: asAddressee } = await supabase
-    .from('friendships')
-    .select('*, friend:profiles!friendships_requester_id_fkey(*)')
-    .eq('addressee_id', user.id)
-    .eq('status', 'accepted');
+  // Fetch both directions in parallel instead of sequentially
+  const [{ data: asRequester }, { data: asAddressee }] = await Promise.all([
+    supabase
+      .from('friendships')
+      .select('*, friend:profiles!friendships_addressee_id_fkey(*)')
+      .eq('requester_id', user.id)
+      .eq('status', 'accepted'),
+    supabase
+      .from('friendships')
+      .select('*, friend:profiles!friendships_requester_id_fkey(*)')
+      .eq('addressee_id', user.id)
+      .eq('status', 'accepted'),
+  ]);
 
   const friends: FriendWithProfile[] = [];
 
@@ -192,11 +192,15 @@ export async function searchUsers(query: string): Promise<Profile[]> {
 
   if (!user || query.length < 2) return [];
 
-  // Normalize phone number search - strip non-digits for matching
-  const normalizedQuery = query.replace(/\D/g, '');
-  const isPhoneSearch = normalizedQuery.length >= 3 && /^\d+$/.test(query.replace(/[\s\-\(\)\.]/g, ''));
+  // Sanitize query: strip characters that could manipulate PostgREST filters
+  const sanitizedQuery = query.replace(/[,()]/g, '').trim();
+  if (sanitizedQuery.length < 2) return [];
 
-  let orFilter = `email.ilike.%${query}%,full_name.ilike.%${query}%,display_name.ilike.%${query}%`;
+  // Normalize phone number search - strip non-digits for matching
+  const normalizedQuery = sanitizedQuery.replace(/\D/g, '');
+  const isPhoneSearch = normalizedQuery.length >= 3 && /^\d+$/.test(sanitizedQuery.replace(/[\s\-\.]/g, ''));
+
+  let orFilter = `email.ilike.%${sanitizedQuery}%,full_name.ilike.%${sanitizedQuery}%,display_name.ilike.%${sanitizedQuery}%`;
 
   // Add phone search if query looks like a phone number
   if (isPhoneSearch) {

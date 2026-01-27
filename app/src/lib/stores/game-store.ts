@@ -16,6 +16,7 @@ interface GameState {
 
   // Optimistic updates
   pendingScores: Map<string, number>; // key: `${playerId}-${hole}`, value: strokes
+  previousScores: Map<string, number | null>; // key: `${playerId}-${hole}`, value: previous strokes (null if new)
 
   // Loading states
   isLoading: boolean;
@@ -42,6 +43,7 @@ const initialState = {
   players: [],
   scores: [],
   pendingScores: new Map(),
+  previousScores: new Map(),
   isLoading: false,
   isSaving: false,
 };
@@ -58,6 +60,16 @@ export const useGameStore = create<GameState>((set, get) => ({
     const key = `${playerId}-${hole}`;
     const pendingScores = new Map(get().pendingScores);
     pendingScores.set(key, strokes);
+
+    // Store previous value for revert
+    const previousScores = new Map(get().previousScores);
+    if (!previousScores.has(key)) {
+      const scores = get().scores;
+      const existing = scores.find(
+        (s) => s.player_id === playerId && s.hole_number === hole
+      );
+      previousScores.set(key, existing?.strokes ?? null);
+    }
 
     // Also update the scores array optimistically
     const scores = [...get().scores];
@@ -79,28 +91,45 @@ export const useGameStore = create<GameState>((set, get) => ({
       });
     }
 
-    set({ pendingScores, scores, isSaving: true });
+    set({ pendingScores, previousScores, scores, isSaving: true });
   },
 
   confirmScore: (playerId, hole) => {
     const key = `${playerId}-${hole}`;
     const pendingScores = new Map(get().pendingScores);
     pendingScores.delete(key);
-    set({ pendingScores, isSaving: pendingScores.size > 0 });
+    const previousScores = new Map(get().previousScores);
+    previousScores.delete(key);
+    set({ pendingScores, previousScores, isSaving: pendingScores.size > 0 });
   },
 
   revertScore: (playerId, hole) => {
     const key = `${playerId}-${hole}`;
     const pendingScores = new Map(get().pendingScores);
-    const previousValue = pendingScores.get(key);
     pendingScores.delete(key);
 
-    // Revert the scores array
-    const scores = get().scores.filter(
-      (s) => !(s.player_id === playerId && s.hole_number === hole && s.id.startsWith('temp-'))
-    );
+    const previousScores = new Map(get().previousScores);
+    const previousValue = previousScores.get(key);
+    previousScores.delete(key);
 
-    set({ pendingScores, scores, isSaving: pendingScores.size > 0 });
+    // Revert the scores array using stored previous value
+    let scores = [...get().scores];
+    if (previousValue === null || previousValue === undefined) {
+      // Was a new score (no previous) -- remove the temp entry
+      scores = scores.filter(
+        (s) => !(s.player_id === playerId && s.hole_number === hole && s.id.startsWith('temp-'))
+      );
+    } else {
+      // Was an existing score -- restore previous strokes value
+      const idx = scores.findIndex(
+        (s) => s.player_id === playerId && s.hole_number === hole
+      );
+      if (idx >= 0) {
+        scores[idx] = { ...scores[idx], strokes: previousValue };
+      }
+    }
+
+    set({ pendingScores, previousScores, scores, isSaving: pendingScores.size > 0 });
   },
 
   reset: () => set(initialState),
@@ -115,8 +144,11 @@ export const useCurrentHole = () => {
   if (!game || players.length === 0) return 1;
 
   // Find the first hole where not all players have scored
+  // Only count scores that have non-null strokes
   for (let hole = 1; hole <= game.holes; hole++) {
-    const holeScores = scores.filter((s) => s.hole_number === hole);
+    const holeScores = scores.filter(
+      (s) => s.hole_number === hole && s.strokes !== null
+    );
     if (holeScores.length < players.length) {
       return hole;
     }

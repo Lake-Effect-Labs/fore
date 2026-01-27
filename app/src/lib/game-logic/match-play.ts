@@ -103,6 +103,7 @@ export function calculateMatchPlay(
  */
 export function getMatchPlayStatusText(
   result: MatchPlayResult,
+  player1Id: string,
   player1Name: string,
   player2Name: string
 ): string {
@@ -110,7 +111,7 @@ export function getMatchPlayStatusText(
     if (result.final_result === 'All Square') {
       return 'Match ended All Square';
     }
-    const winnerName = result.leader_id ? player1Name : player2Name;
+    const winnerName = result.leader_id === player1Id ? player1Name : player2Name;
     return `${winnerName} wins ${result.final_result}`;
   }
 
@@ -118,7 +119,7 @@ export function getMatchPlayStatusText(
     return `All Square, ${result.holes_remaining} to play`;
   }
 
-  const leaderName = result.leader_id === player1Name ? player1Name : player2Name;
+  const leaderName = result.leader_id === player1Id ? player1Name : player2Name;
   return `${leaderName} is ${result.holes_up} up with ${result.holes_remaining} to play`;
 }
 

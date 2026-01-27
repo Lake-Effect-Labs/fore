@@ -39,8 +39,8 @@ export async function createLeague(input: CreateLeagueInput) {
       format: input.format,
       day_of_week: input.day_of_week ?? null,
       start_time: input.start_time || null,
-      max_players: input.max_players || null,
-      entry_fee: input.entry_fee || null,
+      max_players: input.max_players ?? null,
+      entry_fee: input.entry_fee ?? null,
       handicap_percentage: input.handicap_percentage ?? 100,
       settings: input.settings || {},
     })
@@ -217,6 +217,29 @@ export async function createSeason(
   endDate: string
 ) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Check permission
+  const { data: league } = await supabase
+    .from('leagues')
+    .select('organization_id')
+    .eq('id', leagueId)
+    .single();
+
+  if (!league) {
+    return { error: 'League not found' };
+  }
+
+  const role = await getUserRole(league.organization_id);
+  if (!role || !['owner', 'admin', 'pro_shop'].includes(role)) {
+    return { error: 'Not authorized to create seasons' };
+  }
 
   const { data: season, error } = await supabase
     .from('seasons')
@@ -288,7 +311,7 @@ export async function joinLeague(seasonId: string) {
     .insert({
       season_id: seasonId,
       user_id: user.id,
-      handicap_at_start: profile?.handicap || null,
+      handicap_at_start: profile?.handicap ?? null,
     })
     .select()
     .single();
@@ -330,6 +353,39 @@ export async function createRound(
   teeTime?: string
 ) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Check permission via season -> league -> organization
+  const { data: season } = await supabase
+    .from('seasons')
+    .select('league_id')
+    .eq('id', seasonId)
+    .single();
+
+  if (!season) {
+    return { error: 'Season not found' };
+  }
+
+  const { data: league } = await supabase
+    .from('leagues')
+    .select('organization_id')
+    .eq('id', season.league_id)
+    .single();
+
+  if (!league) {
+    return { error: 'League not found' };
+  }
+
+  const role = await getUserRole(league.organization_id);
+  if (!role || !['owner', 'admin', 'pro_shop'].includes(role)) {
+    return { error: 'Not authorized to create rounds' };
+  }
 
   const { data: round, error } = await supabase
     .from('rounds')
@@ -428,7 +484,9 @@ export async function getMyRoundScores(roundId: string, participantId: string): 
   const scores: Record<number, number> = {};
   if (data) {
     for (const score of data) {
-      scores[score.hole_number] = score.strokes;
+      if (score.strokes !== null) {
+        scores[score.hole_number] = score.strokes;
+      }
     }
   }
   return scores;
@@ -530,62 +588,121 @@ export async function getSeasonStandings(
 
 export async function updateStandings(seasonId: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  // Get all participants
-  const participants = await getSeasonParticipants(seasonId);
-  const rounds = await getSeasonRounds(seasonId);
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
 
-  for (const participant of participants) {
+  // Check permission via season -> league -> organization
+  const { data: season } = await supabase
+    .from('seasons')
+    .select('league_id')
+    .eq('id', seasonId)
+    .single();
+
+  if (!season) {
+    return { error: 'Season not found' };
+  }
+
+  const { data: league } = await supabase
+    .from('leagues')
+    .select('organization_id')
+    .eq('id', season.league_id)
+    .single();
+
+  if (!league) {
+    return { error: 'League not found' };
+  }
+
+  const role = await getUserRole(league.organization_id);
+  if (!role || !['owner', 'admin', 'pro_shop'].includes(role)) {
+    return { error: 'Not authorized to update standings' };
+  }
+
+  // Get all participants and rounds
+  const [participants, rounds] = await Promise.all([
+    getSeasonParticipants(seasonId),
+    getSeasonRounds(seasonId),
+  ]);
+
+  // Batch-fetch ALL round_scores for this season's rounds in a single query
+  // instead of O(participants * rounds) individual queries
+  const roundIds = rounds.map((r) => r.id);
+  const { data: allScores } = roundIds.length > 0
+    ? await supabase
+        .from('round_scores')
+        .select('round_id, participant_id, strokes')
+        .in('round_id', roundIds)
+    : { data: [] };
+
+  // Index scores by participant_id -> round_id -> strokes[]
+  const scoresByParticipantRound = new Map<string, Map<string, number[]>>();
+  for (const score of allScores || []) {
+    if (!scoresByParticipantRound.has(score.participant_id)) {
+      scoresByParticipantRound.set(score.participant_id, new Map());
+    }
+    const roundMap = scoresByParticipantRound.get(score.participant_id)!;
+    if (!roundMap.has(score.round_id)) {
+      roundMap.set(score.round_id, []);
+    }
+    roundMap.get(score.round_id)!.push(score.strokes || 0);
+  }
+
+  // Compute standings in-memory and batch upsert
+  const standingUpserts = participants.map((participant) => {
     let totalGross = 0;
     let roundsPlayed = 0;
 
-    for (const round of rounds) {
-      const { data: scores } = await supabase
-        .from('round_scores')
-        .select('strokes')
-        .eq('round_id', round.id)
-        .eq('participant_id', participant.id);
-
-      if (scores && scores.length > 0) {
-        const roundTotal = scores.reduce((sum, s) => sum + (s.strokes || 0), 0);
-        if (roundTotal > 0) {
-          totalGross += roundTotal;
-          roundsPlayed++;
+    const participantRounds = scoresByParticipantRound.get(participant.id);
+    if (participantRounds) {
+      for (const round of rounds) {
+        const scores = participantRounds.get(round.id);
+        if (scores && scores.length > 0) {
+          const roundTotal = scores.reduce((sum, s) => sum + s, 0);
+          if (roundTotal > 0) {
+            totalGross += roundTotal;
+            roundsPlayed++;
+          }
         }
       }
     }
 
-    // Upsert standing
+    return {
+      season_id: seasonId,
+      participant_id: participant.id,
+      rounds_played: roundsPlayed,
+      total_gross: totalGross,
+      average_gross: roundsPlayed > 0 ? totalGross / roundsPlayed : null,
+    };
+  });
+
+  if (standingUpserts.length > 0) {
     await supabase
       .from('league_standings')
-      .upsert(
-        {
-          season_id: seasonId,
-          participant_id: participant.id,
-          rounds_played: roundsPlayed,
-          total_gross: totalGross,
-          average_gross: roundsPlayed > 0 ? totalGross / roundsPlayed : null,
-        },
-        {
-          onConflict: 'season_id,participant_id',
-        }
-      );
+      .upsert(standingUpserts, {
+        onConflict: 'season_id,participant_id',
+      });
   }
 
-  // Update ranks
+  // Update ranks - batch with Promise.all instead of sequential loop
   const { data: standings } = await supabase
     .from('league_standings')
     .select('id, total_gross')
     .eq('season_id', seasonId)
     .order('total_gross');
 
-  if (standings) {
-    for (let i = 0; i < standings.length; i++) {
-      await supabase
-        .from('league_standings')
-        .update({ rank: i + 1 })
-        .eq('id', standings[i].id);
-    }
+  if (standings && standings.length > 0) {
+    await Promise.all(
+      standings.map((entry, i) =>
+        supabase
+          .from('league_standings')
+          .update({ rank: i + 1 })
+          .eq('id', entry.id)
+      )
+    );
   }
 
   revalidatePath(`/seasons/${seasonId}`);

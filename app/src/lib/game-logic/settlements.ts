@@ -8,6 +8,9 @@ import type {
 import { calculateSkins, calculateSkinsSettlements } from './skins';
 import { calculateNassau, calculateNassauSettlements } from './nassau';
 import { calculateMatchPlay, calculateMatchPlaySettlements } from './match-play';
+import { calculateWolf, calculateWolfSettlements } from './wolf';
+import { calculateBestBall, calculateBestBallSettlements } from './best-ball';
+import { calculateBingoBangoBongo, calculateBingoBangoBongoSettlements } from './bingo-bango-bongo';
 
 /**
  * Calculate final settlements for a game based on format
@@ -44,6 +47,21 @@ export function calculateGameSettlements(
         game.holes as 9 | 18
       );
       return calculateMatchPlaySettlements(results, config, playerIds[0], playerIds[1]);
+    }
+
+    case 'wolf': {
+      const results = calculateWolf(scores, config, game.holes);
+      return calculateWolfSettlements(results, playerIds);
+    }
+
+    case 'best_ball': {
+      const results = calculateBestBall(scores, config, players, game.holes);
+      return calculateBestBallSettlements(results, config, players);
+    }
+
+    case 'bingo_bango_bongo': {
+      const results = calculateBingoBangoBongo(scores, config, game.holes);
+      return calculateBingoBangoBongoSettlements(results, config, playerIds);
     }
 
     default:
@@ -155,6 +173,10 @@ export function getGameResultsSummary(
   game: Game,
   summaries: SettlementSummary[]
 ): string {
+  if (summaries.length === 0) {
+    return 'No results available';
+  }
+
   const sortedByNet = [...summaries].sort((a, b) => b.net - a.net);
 
   if (sortedByNet[0].net === 0) {

@@ -19,19 +19,33 @@ interface GameResultsProps {
 export function GameResults({ game, currentUserId }: GameResultsProps) {
   const [summaries, setSummaries] = useState<SettlementSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [markingPaid, setMarkingPaid] = useState<string | null>(null);
 
   useEffect(() => {
-    getSettlementSummaries(game.id).then((data) => {
-      setSummaries(data);
-      setIsLoading(false);
-    });
+    getSettlementSummaries(game.id)
+      .then((data) => {
+        setSummaries(data);
+        setIsLoading(false);
+      })
+      .catch(() => {
+        setError('Failed to load results. Please refresh the page.');
+        setIsLoading(false);
+      });
   }, [game.id]);
 
   const handleMarkPaid = async (settlementId: string) => {
-    await markSettlementPaid(settlementId);
-    // Refresh summaries
-    const updated = await getSettlementSummaries(game.id);
-    setSummaries(updated);
+    setMarkingPaid(settlementId);
+    setError('');
+    try {
+      await markSettlementPaid(settlementId);
+      const updated = await getSettlementSummaries(game.id);
+      setSummaries(updated);
+    } catch {
+      setError('Failed to mark as paid. Please try again.');
+    } finally {
+      setMarkingPaid(null);
+    }
   };
 
   // Sort by net winnings (highest first)
@@ -50,6 +64,13 @@ export function GameResults({ game, currentUserId }: GameResultsProps) {
 
   return (
     <div className="space-y-6">
+      {/* Error Banner */}
+      {error && (
+        <div className="rounded-lg border border-red-800 bg-red-900/20 p-4 text-sm text-red-400">
+          {error}
+        </div>
+      )}
+
       {/* Winner Banner */}
       {winner && winner.net > 0 && (
         <Card className="border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50">

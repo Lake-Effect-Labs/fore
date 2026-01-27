@@ -25,6 +25,11 @@ export async function calculateAndSaveSettlements(gameId: string) {
     return { error: 'Game not found' };
   }
 
+  // Verify user is the game creator
+  if (game.created_by !== user.id) {
+    return { error: 'Only the game creator can calculate settlements' };
+  }
+
   if (!game.config) {
     return { error: 'Game config not found' };
   }
@@ -39,24 +44,45 @@ export async function calculateAndSaveSettlements(gameId: string) {
 
   const pairs = generateSettlementPairs(winnings);
 
-  // Delete existing settlements for this game
-  await supabase.from('settlements').delete().eq('game_id', gameId);
+  // Insert new settlements first, then delete old ones.
+  // This ordering ensures data is never lost: if insert fails,
+  // old settlements remain intact.
+  const newSettlements = pairs.map((pair) => ({
+    game_id: gameId,
+    from_player_id: pair.from,
+    to_player_id: pair.to,
+    amount: pair.amount,
+    reason: game.format,
+    is_paid: false,
+  }));
+
+  // Get existing settlement IDs before inserting new ones
+  const { data: existingSettlements } = await supabase
+    .from('settlements')
+    .select('id')
+    .eq('game_id', gameId);
+
+  const existingIds = (existingSettlements || []).map((s) => s.id);
 
   // Insert new settlements
-  if (pairs.length > 0) {
-    const settlements = pairs.map((pair) => ({
-      game_id: gameId,
-      from_player_id: pair.from,
-      to_player_id: pair.to,
-      amount: pair.amount,
-      reason: game.format,
-      is_paid: false,
-    }));
+  if (newSettlements.length > 0) {
+    const { error: insertError } = await supabase.from('settlements').insert(newSettlements);
 
-    const { error } = await supabase.from('settlements').insert(settlements);
+    if (insertError) {
+      return { error: insertError.message };
+    }
+  }
 
-    if (error) {
-      return { error: error.message };
+  // Delete old settlements only after successful insert
+  if (existingIds.length > 0) {
+    const { error: deleteError } = await supabase
+      .from('settlements')
+      .delete()
+      .in('id', existingIds);
+
+    if (deleteError) {
+      // Non-fatal: new settlements exist, old ones are orphaned but not lost
+      console.error('Failed to clean up old settlements:', deleteError.message);
     }
   }
 

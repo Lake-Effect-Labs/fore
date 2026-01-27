@@ -1,19 +1,26 @@
 import Stripe from 'stripe';
 
-function getStripe() {
+// Cache the Stripe instance to reuse the underlying HTTP client/connection pool
+let stripeInstance: Stripe | null = null;
+
+function getStripe(): Stripe {
+  if (stripeInstance) return stripeInstance;
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) {
     throw new Error('STRIPE_SECRET_KEY is not set');
   }
-  return new Stripe(key, {
+  stripeInstance = new Stripe(key, {
     apiVersion: '2025-12-15.clover',
   });
+  return stripeInstance;
 }
 
-// Price IDs for subscriptions (stubbed - replace with real ones in production)
+// Price IDs for subscriptions
+// NOTE: Fallback values are development stubs. In production, ensure env vars are set
+// or checkout.sessions.create will fail with an invalid price_id error from Stripe.
 export const STRIPE_PRICES = {
-  PREMIUM_MONTHLY: process.env.STRIPE_PREMIUM_MONTHLY_PRICE_ID || 'price_premium_monthly',
-  PREMIUM_YEARLY: process.env.STRIPE_PREMIUM_YEARLY_PRICE_ID || 'price_premium_yearly',
+  PREMIUM_MONTHLY: process.env.STRIPE_PREMIUM_MONTHLY_PRICE_ID ?? 'price_premium_monthly',
+  PREMIUM_YEARLY: process.env.STRIPE_PREMIUM_YEARLY_PRICE_ID ?? 'price_premium_yearly',
 };
 
 /**

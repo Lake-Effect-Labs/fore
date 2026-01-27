@@ -27,9 +27,9 @@ export async function createFacility(input: CreateFacilityInput) {
       organization_id: input.organization_id,
       name: input.name,
       holes: input.holes,
-      par: input.par || null,
-      slope_rating: input.slope_rating || null,
-      course_rating: input.course_rating || null,
+      par: input.par ?? null,
+      slope_rating: input.slope_rating ?? null,
+      course_rating: input.course_rating ?? null,
     })
     .select()
     .single();
@@ -92,31 +92,42 @@ export async function getFacilityWithDetails(
 
   if (!facility) return null;
 
-  const { data: tees } = await supabase
-    .from('tees')
-    .select('*')
-    .eq('facility_id', facilityId)
-    .order('total_yards', { ascending: false });
+  // Fetch tees and holes in parallel
+  const [{ data: tees }, { data: holes }] = await Promise.all([
+    supabase
+      .from('tees')
+      .select('*')
+      .eq('facility_id', facilityId)
+      .order('total_yards', { ascending: false }),
+    supabase
+      .from('holes')
+      .select('*')
+      .eq('facility_id', facilityId)
+      .order('hole_number'),
+  ]);
 
-  const { data: holes } = await supabase
-    .from('holes')
-    .select('*')
-    .eq('facility_id', facilityId)
-    .order('hole_number');
-
-  // Get yardages for all holes
-  const holesWithYardages = await Promise.all(
-    (holes || []).map(async (hole) => {
-      const { data: yardages } = await supabase
+  // Batch-fetch all yardages for all holes in a single query instead of N+1
+  const holeIds = (holes || []).map((h) => h.id);
+  const { data: allYardages } = holeIds.length > 0
+    ? await supabase
         .from('hole_yardages')
         .select('*')
-        .eq('hole_id', hole.id);
-      return {
-        ...hole,
-        yardages: yardages || [],
-      };
-    })
-  );
+        .in('hole_id', holeIds)
+    : { data: [] };
+
+  // Index yardages by hole_id
+  const yardagesByHoleId = new Map<string, HoleYardage[]>();
+  for (const yardage of allYardages || []) {
+    if (!yardagesByHoleId.has(yardage.hole_id)) {
+      yardagesByHoleId.set(yardage.hole_id, []);
+    }
+    yardagesByHoleId.get(yardage.hole_id)!.push(yardage);
+  }
+
+  const holesWithYardages = (holes || []).map((hole) => ({
+    ...hole,
+    yardages: yardagesByHoleId.get(hole.id) || [],
+  }));
 
   return {
     ...facility,
@@ -181,16 +192,39 @@ export async function createTee(
   courseRating?: number
 ) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Check permission via facility -> organization
+  const { data: facility } = await supabase
+    .from('facilities')
+    .select('organization_id')
+    .eq('id', facilityId)
+    .single();
+
+  if (!facility) {
+    return { error: 'Facility not found' };
+  }
+
+  const role = await getUserRole(facility.organization_id);
+  if (!role || !['owner', 'admin'].includes(role)) {
+    return { error: 'Not authorized to create tees' };
+  }
 
   const { data: tee, error } = await supabase
     .from('tees')
     .insert({
       facility_id: facilityId,
       name,
-      color: color || null,
-      total_yards: totalYards || null,
-      slope_rating: slopeRating || null,
-      course_rating: courseRating || null,
+      color: color ?? null,
+      total_yards: totalYards ?? null,
+      slope_rating: slopeRating ?? null,
+      course_rating: courseRating ?? null,
     })
     .select()
     .single();
@@ -224,6 +258,39 @@ export async function updateHole(
   data: { par?: number; handicap_index?: number }
 ) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Get the hole's facility to check permission
+  const { data: hole } = await supabase
+    .from('holes')
+    .select('facility_id')
+    .eq('id', holeId)
+    .single();
+
+  if (!hole) {
+    return { error: 'Hole not found' };
+  }
+
+  const { data: facility } = await supabase
+    .from('facilities')
+    .select('organization_id')
+    .eq('id', hole.facility_id)
+    .single();
+
+  if (!facility) {
+    return { error: 'Facility not found' };
+  }
+
+  const role = await getUserRole(facility.organization_id);
+  if (!role || !['owner', 'admin'].includes(role)) {
+    return { error: 'Not authorized to update holes' };
+  }
 
   const { error } = await supabase
     .from('holes')
@@ -259,6 +326,39 @@ export async function setHoleYardage(
   yards: number
 ) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Check permission via hole -> facility -> organization
+  const { data: hole } = await supabase
+    .from('holes')
+    .select('facility_id')
+    .eq('id', holeId)
+    .single();
+
+  if (!hole) {
+    return { error: 'Hole not found' };
+  }
+
+  const { data: facility } = await supabase
+    .from('facilities')
+    .select('organization_id')
+    .eq('id', hole.facility_id)
+    .single();
+
+  if (!facility) {
+    return { error: 'Facility not found' };
+  }
+
+  const role = await getUserRole(facility.organization_id);
+  if (!role || !['owner', 'admin'].includes(role)) {
+    return { error: 'Not authorized to update yardages' };
+  }
 
   const { error } = await supabase
     .from('hole_yardages')
@@ -292,30 +392,56 @@ export async function bulkUpdateHoles(
   }[]
 ) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  for (const hole of holes) {
-    const updateData: Record<string, unknown> = {
-      par: hole.par,
-      handicap_index: hole.handicap_index,
-    };
-
-    // Only include optional fields if they're defined
-    if (hole.yardage !== undefined) {
-      updateData.yardage = hole.yardage || null;
-    }
-    if (hole.pin_placement !== undefined) {
-      updateData.pin_placement = hole.pin_placement;
-    }
-    if (hole.notes !== undefined) {
-      updateData.notes = hole.notes || null;
-    }
-
-    await supabase
-      .from('holes')
-      .update(updateData)
-      .eq('facility_id', facilityId)
-      .eq('hole_number', hole.hole_number);
+  if (!user) {
+    return { error: 'Not authenticated' };
   }
+
+  // Check permission
+  const { data: facility } = await supabase
+    .from('facilities')
+    .select('organization_id')
+    .eq('id', facilityId)
+    .single();
+
+  if (!facility) {
+    return { error: 'Facility not found' };
+  }
+
+  const role = await getUserRole(facility.organization_id);
+  if (!role || !['owner', 'admin'].includes(role)) {
+    return { error: 'Not authorized to update holes' };
+  }
+
+  // TODO: PERF - These updates cannot be fully batched into a single query because
+  // each hole may have different optional fields set. Using Promise.all for parallelism.
+  await Promise.all(
+    holes.map((hole) => {
+      const updateData: Record<string, unknown> = {
+        par: hole.par,
+        handicap_index: hole.handicap_index,
+      };
+
+      if (hole.yardage !== undefined) {
+        updateData.yardage = hole.yardage || null;
+      }
+      if (hole.pin_placement !== undefined) {
+        updateData.pin_placement = hole.pin_placement;
+      }
+      if (hole.notes !== undefined) {
+        updateData.notes = hole.notes || null;
+      }
+
+      return supabase
+        .from('holes')
+        .update(updateData)
+        .eq('facility_id', facilityId)
+        .eq('hole_number', hole.hole_number);
+    })
+  );
 
   revalidatePath(`/facilities/${facilityId}`);
   return { success: true };
@@ -327,6 +453,29 @@ export async function bulkUpdateYardages(
   yardages: { hole_number: number; yards: number }[]
 ) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Check permission
+  const { data: facility } = await supabase
+    .from('facilities')
+    .select('organization_id')
+    .eq('id', facilityId)
+    .single();
+
+  if (!facility) {
+    return { error: 'Facility not found' };
+  }
+
+  const role = await getUserRole(facility.organization_id);
+  if (!role || !['owner', 'admin'].includes(role)) {
+    return { error: 'Not authorized to update yardages' };
+  }
 
   // Get hole IDs
   const { data: holes } = await supabase
@@ -336,19 +485,26 @@ export async function bulkUpdateYardages(
 
   if (!holes) return { error: 'No holes found' };
 
-  for (const yardage of yardages) {
-    const hole = holes.find((h) => h.hole_number === yardage.hole_number);
-    if (hole) {
-      await supabase
-        .from('hole_yardages')
-        .upsert(
-          {
-            hole_id: hole.id,
-            tee_id: teeId,
-            yards: yardage.yards,
-          },
-          { onConflict: 'hole_id,tee_id' }
-        );
+  // Batch upsert all yardages in a single query instead of N+1
+  const upsertData = yardages
+    .map((yardage) => {
+      const hole = holes.find((h) => h.hole_number === yardage.hole_number);
+      if (!hole) return null;
+      return {
+        hole_id: hole.id,
+        tee_id: teeId,
+        yards: yardage.yards,
+      };
+    })
+    .filter((d): d is NonNullable<typeof d> => d !== null);
+
+  if (upsertData.length > 0) {
+    const { error } = await supabase
+      .from('hole_yardages')
+      .upsert(upsertData, { onConflict: 'hole_id,tee_id' });
+
+    if (error) {
+      return { error: error.message };
     }
   }
 

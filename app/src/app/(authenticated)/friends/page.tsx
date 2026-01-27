@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +42,7 @@ export default function FriendsPage() {
   const [sendingRequest, setSendingRequest] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Get the invite link - just the signup page for now
   const inviteLink = typeof window !== 'undefined'
@@ -101,30 +102,39 @@ export default function FriendsPage() {
   };
 
   const loadData = async () => {
-    const [friendsData, pendingData] = await Promise.all([
-      getFriends(),
-      getPendingFriendRequests(),
-    ]);
-    setFriends(friendsData);
-    setPendingRequests(pendingData);
-    setIsLoading(false);
+    try {
+      const [friendsData, pendingData] = await Promise.all([
+        getFriends(),
+        getPendingFriendRequests(),
+      ]);
+      setFriends(friendsData);
+      setPendingRequests(pendingData);
+    } catch {
+      setMessage('Failed to load friends. Please refresh the page.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const handleSearch = async (query: string) => {
+  const handleSearch = useCallback((query: string) => {
     setSearchQuery(query);
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
     if (query.length >= 2) {
-      const results = await searchUsers(query);
-      // Filter out existing friends
-      const friendIds = friends.map((f) => f.friend.id);
-      setSearchResults(results.filter((r) => !friendIds.includes(r.id)));
+      searchTimerRef.current = setTimeout(async () => {
+        const results = await searchUsers(query);
+        const friendIds = friends.map((f) => f.friend.id);
+        setSearchResults(results.filter((r) => !friendIds.includes(r.id)));
+      }, 300);
     } else {
       setSearchResults([]);
     }
-  };
+  }, [friends]);
 
   const handleSendRequest = async (userId: string) => {
     setSendingRequest(userId);
@@ -143,13 +153,32 @@ export default function FriendsPage() {
     friendshipId: string,
     response: 'accepted' | 'declined'
   ) => {
-    await respondToFriendRequest(friendshipId, response);
-    await loadData();
+    setMessage('');
+    try {
+      const result = await respondToFriendRequest(friendshipId, response);
+      if (result?.error) {
+        setMessage(result.error);
+      } else {
+        await loadData();
+      }
+    } catch {
+      setMessage('Failed to respond to friend request. Please try again.');
+    }
   };
 
   const handleRemoveFriend = async (friendshipId: string) => {
-    await removeFriend(friendshipId);
-    await loadData();
+    if (!confirm('Are you sure you want to remove this friend?')) return;
+    setMessage('');
+    try {
+      const result = await removeFriend(friendshipId);
+      if (result?.error) {
+        setMessage(result.error);
+      } else {
+        await loadData();
+      }
+    } catch {
+      setMessage('Failed to remove friend. Please try again.');
+    }
   };
 
   return (

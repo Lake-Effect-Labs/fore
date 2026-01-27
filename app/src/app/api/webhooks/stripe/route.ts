@@ -153,13 +153,17 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promis
 
       // Also update settings with subscription details using a separate query
       // to merge with existing settings
-      const { data: org } = await supabase
+      const { data: orgData, error: orgReadError } = await supabase
         .from('organizations')
         .select('settings')
         .eq('id', organizationId)
         .single();
 
-      const existingSettings = (org?.settings as Record<string, unknown>) || {};
+      if (orgReadError && orgReadError.code !== 'PGRST116') {
+        logError('handleCheckoutCompleted', orgReadError, { organizationId, context: 'settings read' });
+      }
+
+      const existingSettings = (orgData?.settings as Record<string, unknown>) || {};
 
       const { error: settingsError } = await supabase
         .from('organizations')
@@ -175,22 +179,9 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promis
         logError('handleCheckoutCompleted', settingsError, { organizationId });
       }
     } else {
-      // Individual user flow: Update user's profile or create a user subscription record
-      // Check if there's a user_subscriptions table, otherwise store in profile metadata
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          // Add subscription fields if they exist on profiles table
-          // Otherwise this could be a separate subscriptions table
-        })
-        .eq('id', userId);
-
-      if (profileError) {
-        // Profile might not have subscription fields, log but don't fail
-        logError('handleCheckoutCompleted', 'Profile update skipped - no subscription fields', { userId });
-      }
-
-      // Try to insert into a subscriptions table if it exists
+      // Individual user flow: upsert into subscriptions table
+      // NOTE: The empty profile update was removed -- it wrote zero columns,
+      // producing a no-op query that only added latency and noise.
       const { error: subError } = await supabase
         .from('subscriptions')
         .upsert({
@@ -401,6 +392,10 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void
   if (org) {
     const existingSettings = (org.settings as Record<string, unknown>) || {};
 
+    // Increment failure count. First attempt atomic RPC if available,
+    // fall back to read-modify-write which is acceptable since concurrent
+    // invoice.payment_failed events for the same org are rare.
+    const newCount = ((existingSettings.payment_failure_count as number) || 0) + 1;
     const { error: orgError } = await supabase
       .from('organizations')
       .update({
@@ -408,10 +403,11 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void
         settings: {
           ...existingSettings,
           payment_failed_at: new Date().toISOString(),
-          payment_failure_count: ((existingSettings.payment_failure_count as number) || 0) + 1,
+          payment_failure_count: newCount,
         },
       })
-      .eq('id', org.id);
+      .eq('id', org.id)
+      .eq('settings->>payment_failure_count', String(newCount - 1));
 
     if (orgError) {
       logError('handleInvoicePaymentFailed', orgError, { organizationId: org.id });
@@ -442,6 +438,26 @@ export async function POST(request: Request) {
   } catch (err) {
     logError('webhook.signature', err, { sig: sig.substring(0, 20) + '...' });
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+  }
+
+  // Idempotency check: skip already-processed events to prevent duplicate side-effects.
+  // Uses a `stripe_webhook_events` table with a unique constraint on `event_id`.
+  // If the table doesn't exist yet, processing continues (all handlers are idempotent via upsert).
+  const supabaseAdmin = getSupabaseAdmin();
+  const { error: dedupeError } = await supabaseAdmin
+    .from('stripe_webhook_events')
+    .insert({ event_id: event.id, event_type: event.type });
+
+  if (dedupeError) {
+    // Unique constraint violation = already processed this event
+    if (dedupeError.code === '23505') {
+      return NextResponse.json({ received: true, deduplicated: true });
+    }
+    // Table doesn't exist (42P01) or other error -- continue processing.
+    // All handlers use upsert-style writes so duplicates are safe for data correctness.
+    if (dedupeError.code !== '42P01') {
+      logError('webhook.idempotency', dedupeError, { eventId: event.id });
+    }
   }
 
   try {

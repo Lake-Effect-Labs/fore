@@ -155,7 +155,7 @@ export function LeaguesClient({ publicLeagues, myLeagues }: LeaguesClientProps) 
                             </Badge>
                           )}
                           {league.day_of_week !== null && league.day_of_week !== undefined && (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="secondary" className="text-xs">
                               <Calendar className="mr-1 h-3 w-3" />
                               {dayLabels[league.day_of_week]}
                             </Badge>
@@ -208,13 +208,13 @@ export function LeaguesClient({ publicLeagues, myLeagues }: LeaguesClientProps) 
                             </Badge>
                           )}
                           {league.day_of_week !== null && league.day_of_week !== undefined && (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="secondary" className="text-xs">
                               <Calendar className="mr-1 h-3 w-3" />
                               {dayLabels[league.day_of_week]}
                             </Badge>
                           )}
                           {league.entry_fee && (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="secondary" className="text-xs">
                               ${league.entry_fee}
                             </Badge>
                           )}
@@ -224,7 +224,7 @@ export function LeaguesClient({ publicLeagues, myLeagues }: LeaguesClientProps) 
                     <div className="mt-4">
                       {seasonId ? (
                         hasJoined ? (
-                          <Button variant="outline" size="sm" disabled className="w-full">
+                          <Button variant="secondary" size="sm" disabled className="w-full">
                             <Check className="mr-2 h-4 w-4 text-emerald-500" />
                             Joined
                           </Button>
@@ -244,7 +244,7 @@ export function LeaguesClient({ publicLeagues, myLeagues }: LeaguesClientProps) 
                           </Button>
                         )
                       ) : (
-                        <Button variant="outline" size="sm" disabled className="w-full">
+                        <Button variant="secondary" size="sm" disabled className="w-full">
                           No Active Season
                         </Button>
                       )}

@@ -29,6 +29,8 @@ export function CourseEditor({
   const [showAddTee, setShowAddTee] = useState(false);
   const [newTeeName, setNewTeeName] = useState('');
   const [newTeeColor, setNewTeeColor] = useState('');
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Local state for editing
   const [localHoles, setLocalHoles] = useState(
@@ -40,19 +42,42 @@ export function CourseEditor({
   );
 
   const handleSaveHoles = () => {
+    setSaveError(null);
+    setSaveSuccess(false);
     startTransition(async () => {
-      await bulkUpdateHoles(facilityId, localHoles);
-      setEditMode(false);
+      try {
+        const result = await bulkUpdateHoles(facilityId, localHoles);
+        if (result?.error) {
+          setSaveError(result.error);
+        } else {
+          setEditMode(false);
+          setSaveSuccess(true);
+          setTimeout(() => setSaveSuccess(false), 3000);
+        }
+      } catch {
+        setSaveError('Failed to save hole data. Please try again.');
+      }
     });
   };
 
   const handleAddTee = () => {
     if (!newTeeName) return;
+    setSaveError(null);
     startTransition(async () => {
-      await createTee(facilityId, newTeeName, newTeeColor || undefined);
-      setShowAddTee(false);
-      setNewTeeName('');
-      setNewTeeColor('');
+      try {
+        const result = await createTee(facilityId, newTeeName, newTeeColor || undefined);
+        if (result?.error) {
+          setSaveError(result.error);
+        } else {
+          setShowAddTee(false);
+          setNewTeeName('');
+          setNewTeeColor('');
+          setSaveSuccess(true);
+          setTimeout(() => setSaveSuccess(false), 3000);
+        }
+      } catch {
+        setSaveError('Failed to add tee. Please try again.');
+      }
     });
   };
 
@@ -79,6 +104,18 @@ export function CourseEditor({
 
   return (
     <div className="space-y-4">
+      {/* Save Feedback */}
+      {saveError && (
+        <div className="rounded-lg border border-red-800 bg-red-900/20 p-3 text-sm text-red-400">
+          {saveError}
+        </div>
+      )}
+      {saveSuccess && (
+        <div className="rounded-lg border border-green-800 bg-green-900/20 p-3 text-sm text-green-400">
+          Changes saved successfully.
+        </div>
+      )}
+
       {canEdit && (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

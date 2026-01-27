@@ -59,14 +59,14 @@ export async function createEvent(input: CreateEventInput) {
       format: input.format || 'scramble',
       status: 'draft',
       visibility: 'link', // Default to link access
-      max_players: input.max_players || null,
-      entry_fee: input.entry_fee || null,
-      course_fee: input.course_fee || null,
-      team_size: input.team_size || 4, // Default to foursomes
-      handicap_percentage: input.handicap_percentage || 100,
-      flights_enabled: input.flights_enabled || false,
+      max_players: input.max_players ?? null,
+      entry_fee: input.entry_fee ?? null,
+      course_fee: input.course_fee ?? null,
+      team_size: input.team_size ?? 4, // Default to foursomes
+      handicap_percentage: input.handicap_percentage ?? 100,
+      flights_enabled: input.flights_enabled ?? false,
       shotgun_start: input.shotgun_start ?? true, // Default to shotgun for outings
-      prize_pool: input.prize_pool || null,
+      prize_pool: input.prize_pool ?? null,
       settings: input.settings || {},
       organizer_can_configure: input.organizer_can_configure ?? false,
     })
@@ -100,7 +100,8 @@ export async function getOrganizationEvents(orgId: string): Promise<Event[]> {
     .from('events')
     .select('*')
     .eq('organization_id', orgId)
-    .order('event_date', { ascending: false });
+    .order('event_date', { ascending: false })
+    .limit(100);
 
   return (data || []) as Event[];
 }
@@ -252,7 +253,8 @@ export async function registerForEvent(eventId: string, teamName?: string) {
     return { error: 'Already registered for this event' };
   }
 
-  // Check max players
+  // Check max players -- use optimistic insert with re-check to mitigate race condition.
+  // We insert first, then count. If over capacity, downgrade to waitlist.
   if (event.max_players) {
     const { count } = await supabase
       .from('event_registrations')
@@ -260,7 +262,7 @@ export async function registerForEvent(eventId: string, teamName?: string) {
       .eq('event_id', eventId)
       .in('status', ['pending', 'confirmed']);
 
-    if (count && count >= event.max_players) {
+    if (count !== null && count >= event.max_players) {
       // Waitlist
       const { data: registration, error } = await supabase
         .from('event_registrations')
@@ -269,7 +271,7 @@ export async function registerForEvent(eventId: string, teamName?: string) {
           user_id: user.id,
           team_name: teamName || null,
           status: 'waitlisted',
-          handicap_at_registration: profile?.handicap || null,
+          handicap_at_registration: profile?.handicap ?? null,
         })
         .select()
         .single();
@@ -282,15 +284,16 @@ export async function registerForEvent(eventId: string, teamName?: string) {
     }
   }
 
-  // Normal registration
+  // Insert registration
+  const registrationStatus = event.entry_fee ? 'pending' : 'confirmed';
   const { data: registration, error } = await supabase
     .from('event_registrations')
     .insert({
       event_id: eventId,
       user_id: user.id,
       team_name: teamName || null,
-      status: event.entry_fee ? 'pending' : 'confirmed',
-      handicap_at_registration: profile?.handicap || null,
+      status: registrationStatus,
+      handicap_at_registration: profile?.handicap ?? null,
       payment_status: event.entry_fee ? 'pending' : 'not_required',
     })
     .select()
@@ -298,6 +301,26 @@ export async function registerForEvent(eventId: string, teamName?: string) {
 
   if (error) {
     return { error: error.message };
+  }
+
+  // Re-check capacity after insert to handle race condition.
+  // If another registration slipped in between our count and insert,
+  // downgrade this one to waitlisted.
+  if (event.max_players) {
+    const { count: postInsertCount } = await supabase
+      .from('event_registrations')
+      .select('id', { count: 'exact' })
+      .eq('event_id', eventId)
+      .in('status', ['pending', 'confirmed']);
+
+    if (postInsertCount !== null && postInsertCount > event.max_players) {
+      await supabase
+        .from('event_registrations')
+        .update({ status: 'waitlisted' })
+        .eq('id', registration.id);
+
+      return { success: true, registration: { ...registration, status: 'waitlisted' } as EventRegistration, waitlisted: true };
+    }
   }
 
   revalidatePath(`/events/${eventId}`);
@@ -308,6 +331,11 @@ export async function getEventRegistrations(
   eventId: string
 ): Promise<(EventRegistration & { profile: { id: string; email: string; full_name: string | null; avatar_url: string | null; handicap: number | null } | null })[]> {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
 
   const { data } = await supabase
     .from('event_registrations')
@@ -383,6 +411,28 @@ export async function createFlight(
   maxHandicap?: number
 ) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Verify user is organizer or admin
+  const isOrganizer = await isEventOrganizer(eventId);
+  if (!isOrganizer) {
+    const { data: event } = await supabase
+      .from('events')
+      .select('organization_id')
+      .eq('id', eventId)
+      .single();
+    if (!event) return { error: 'Event not found' };
+    const role = await getUserRole(event.organization_id);
+    if (!role || !['owner', 'admin', 'pro_shop'].includes(role)) {
+      return { error: 'Not authorized to create flights' };
+    }
+  }
 
   const { data: flight, error } = await supabase
     .from('flights')
@@ -417,6 +467,39 @@ export async function getEventFlights(eventId: string): Promise<Flight[]> {
 
 export async function assignFlight(registrationId: string, flightId: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Get registration to find event
+  const { data: registration } = await supabase
+    .from('event_registrations')
+    .select('event_id')
+    .eq('id', registrationId)
+    .single();
+
+  if (!registration) {
+    return { error: 'Registration not found' };
+  }
+
+  // Verify user is organizer or admin
+  const isOrg = await isEventOrganizer(registration.event_id);
+  if (!isOrg) {
+    const { data: event } = await supabase
+      .from('events')
+      .select('organization_id')
+      .eq('id', registration.event_id)
+      .single();
+    if (!event) return { error: 'Event not found' };
+    const role = await getUserRole(event.organization_id);
+    if (!role || !['owner', 'admin', 'pro_shop'].includes(role)) {
+      return { error: 'Not authorized to assign flights' };
+    }
+  }
 
   const { error } = await supabase
     .from('event_registrations')
@@ -608,31 +691,56 @@ async function updateEventLeaderboard(eventId: string, registrationId: string) {
       }
     );
 
-  // Update positions
+  // Update positions - batch update using Promise.all instead of sequential N+1
   const { data: leaderboard } = await supabase
     .from('event_leaderboard')
     .select('id, total_gross')
     .eq('event_id', eventId)
     .order('total_gross');
 
-  if (leaderboard) {
-    for (let i = 0; i < leaderboard.length; i++) {
-      await supabase
-        .from('event_leaderboard')
-        .update({ position: i + 1 })
-        .eq('id', leaderboard[i].id);
-    }
+  if (leaderboard && leaderboard.length > 0) {
+    await Promise.all(
+      leaderboard.map((entry, i) =>
+        supabase
+          .from('event_leaderboard')
+          .update({ position: i + 1 })
+          .eq('id', entry.id)
+      )
+    );
   }
 }
 
 export async function recalculateLeaderboard(eventId: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Verify user is organizer or org admin
+  const isOrganizer = await isEventOrganizer(eventId);
+  if (!isOrganizer) {
+    const { data: event } = await supabase
+      .from('events')
+      .select('organization_id')
+      .eq('id', eventId)
+      .single();
+    if (!event) return { error: 'Event not found' };
+    const role = await getUserRole(event.organization_id);
+    if (!role || !['owner', 'admin', 'pro_shop'].includes(role)) {
+      return { error: 'Not authorized to recalculate leaderboard' };
+    }
+  }
 
   const registrations = await getEventRegistrations(eventId);
 
-  for (const reg of registrations) {
-    await updateEventLeaderboard(eventId, reg.id);
-  }
+  // Process all registrations in parallel instead of sequential N+1
+  await Promise.all(
+    registrations.map((reg) => updateEventLeaderboard(eventId, reg.id))
+  );
 
   revalidatePath(`/events/${eventId}`);
   return { success: true };
@@ -790,18 +898,42 @@ export async function assignOrganizer(eventId: string, organizerEmail: string) {
 }
 
 export async function openEventRegistration(eventId: string) {
+  // Check if user is organizer OR has admin role on the org
   const isOrganizer = await isEventOrganizer(eventId);
   if (!isOrganizer) {
-    return { error: 'Not authorized' };
+    // Fall back to updateEvent which checks org-level admin role
+    const supabase = await createClient();
+    const { data: event } = await supabase
+      .from('events')
+      .select('organization_id')
+      .eq('id', eventId)
+      .single();
+    if (!event) return { error: 'Event not found' };
+    const role = await getUserRole(event.organization_id);
+    if (!role || !['owner', 'admin', 'pro_shop'].includes(role)) {
+      return { error: 'Not authorized' };
+    }
   }
 
   return updateEvent(eventId, { status: 'open' as EventStatus });
 }
 
 export async function closeEventRegistration(eventId: string) {
+  // Check if user is organizer OR has admin role on the org
   const isOrganizer = await isEventOrganizer(eventId);
   if (!isOrganizer) {
-    return { error: 'Not authorized' };
+    // Fall back to updateEvent which checks org-level admin role
+    const supabase = await createClient();
+    const { data: event } = await supabase
+      .from('events')
+      .select('organization_id')
+      .eq('id', eventId)
+      .single();
+    if (!event) return { error: 'Event not found' };
+    const role = await getUserRole(event.organization_id);
+    if (!role || !['owner', 'admin', 'pro_shop'].includes(role)) {
+      return { error: 'Not authorized' };
+    }
   }
 
   return updateEvent(eventId, { status: 'closed' as EventStatus });
@@ -1001,61 +1133,91 @@ export async function registerWithFoursome(
       .update({ group_number: nextGroupNumber })
       .eq('id', result.registration?.id);
 
-    // Create registrations for each teammate
+    // Batch-fetch all teammate profiles in one query instead of N individual lookups
+    const emails = teammates.map((t) => t.email.toLowerCase().trim());
+    const { data: existingProfiles } = await supabase
+      .from('profiles')
+      .select('id, email, handicap')
+      .in('email', emails);
+
+    const profileByEmail = new Map(
+      (existingProfiles || []).map((p) => [p.email.toLowerCase(), p])
+    );
+
+    // Batch-fetch existing registrations for this event
+    const profileIds = (existingProfiles || []).map((p) => p.id);
+    const orFilters = [
+      ...profileIds.map((id) => `user_id.eq.${id}`),
+      ...emails.map((e) => `guest_email.eq.${e}`),
+    ];
+    const { data: existingEventRegs } = orFilters.length > 0
+      ? await supabase
+          .from('event_registrations')
+          .select('id, user_id, guest_email')
+          .eq('event_id', eventId)
+          .or(orFilters.join(','))
+      : { data: [] };
+
+    // Index existing registrations
+    const regByUserId = new Map<string, string>();
+    const regByEmail = new Map<string, string>();
+    for (const reg of existingEventRegs || []) {
+      if (reg.user_id) regByUserId.set(reg.user_id, reg.id);
+      if (reg.guest_email) regByEmail.set(reg.guest_email.toLowerCase(), reg.id);
+    }
+
+    // Process each teammate with pre-fetched data (no more N+1)
+    const updatePromises: PromiseLike<unknown>[] = [];
+    const newRegistrations: Record<string, unknown>[] = [];
+
     for (const teammate of teammates) {
       const email = teammate.email.toLowerCase().trim();
+      const existingProfile = profileByEmail.get(email);
+      const existingRegId = existingProfile
+        ? regByUserId.get(existingProfile.id) || regByEmail.get(email)
+        : regByEmail.get(email);
 
-      // Check if they already have an account
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id, handicap')
-        .eq('email', email)
-        .single();
-
-      // Check if already registered for this event
-      const { data: existingReg } = await supabase
-        .from('event_registrations')
-        .select('id')
-        .eq('event_id', eventId)
-        .or(`user_id.eq.${existingProfile?.id},guest_email.eq.${email}`)
-        .single();
-
-      if (existingReg) {
+      if (existingRegId) {
         // Already registered, just update their group
-        await supabase
-          .from('event_registrations')
-          .update({ group_number: nextGroupNumber })
-          .eq('id', existingReg.id);
+        updatePromises.push(
+          supabase
+            .from('event_registrations')
+            .update({ group_number: nextGroupNumber })
+            .eq('id', existingRegId)
+        );
       } else if (existingProfile) {
-        // Has account, create registration linked to their user_id
-        await supabase
-          .from('event_registrations')
-          .insert({
-            event_id: eventId,
-            user_id: existingProfile.id,
-            status: 'pending',
-            group_number: nextGroupNumber,
-            handicap_at_registration: teammate.handicap ?? existingProfile.handicap,
-            payment_status: 'pending',
-            invited_by: user.id,
-          });
+        newRegistrations.push({
+          event_id: eventId,
+          user_id: existingProfile.id,
+          status: 'pending',
+          group_number: nextGroupNumber,
+          handicap_at_registration: teammate.handicap ?? existingProfile.handicap,
+          payment_status: 'pending',
+          invited_by: user.id,
+        });
       } else {
-        // No account - create guest registration
-        await supabase
-          .from('event_registrations')
-          .insert({
-            event_id: eventId,
-            user_id: null,
-            guest_name: teammate.name,
-            guest_email: email,
-            status: 'pending',
-            group_number: nextGroupNumber,
-            handicap_at_registration: teammate.handicap ?? null,
-            payment_status: 'pending',
-            invited_by: user.id,
-          });
+        newRegistrations.push({
+          event_id: eventId,
+          user_id: null,
+          guest_name: teammate.name,
+          guest_email: email,
+          status: 'pending',
+          group_number: nextGroupNumber,
+          handicap_at_registration: teammate.handicap ?? null,
+          payment_status: 'pending',
+          invited_by: user.id,
+        });
       }
     }
+
+    // Execute updates and inserts in parallel batches
+    const batchOps: PromiseLike<unknown>[] = [...updatePromises];
+    if (newRegistrations.length > 0) {
+      batchOps.push(
+        supabase.from('event_registrations').insert(newRegistrations)
+      );
+    }
+    await Promise.all(batchOps);
   }
 
   revalidatePath(`/events/${eventId}`);
@@ -1065,6 +1227,18 @@ export async function registerWithFoursome(
 // Claim a guest registration when user creates an account
 export async function claimGuestRegistrations(userEmail: string, userId: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Verify the authenticated user matches the claimed userId and email
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  if (user.id !== userId || user.email?.toLowerCase() !== userEmail.toLowerCase()) {
+    return { error: 'Not authorized to claim these registrations' };
+  }
 
   // Find any guest registrations with this email
   const { data: guestRegs } = await supabase
@@ -1077,17 +1251,16 @@ export async function claimGuestRegistrations(userEmail: string, userId: string)
     return { success: true, claimed: 0 };
   }
 
-  // Update each registration to link to the new user
-  for (const reg of guestRegs) {
-    await supabase
-      .from('event_registrations')
-      .update({
-        user_id: userId,
-        guest_name: null,
-        guest_email: null,
-      })
-      .eq('id', reg.id);
-  }
+  // Batch update all guest registrations in a single query instead of N+1
+  const regIds = guestRegs.map((r) => r.id);
+  await supabase
+    .from('event_registrations')
+    .update({
+      user_id: userId,
+      guest_name: null,
+      guest_email: null,
+    })
+    .in('id', regIds);
 
   return { success: true, claimed: guestRegs.length };
 }

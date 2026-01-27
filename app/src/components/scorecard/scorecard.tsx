@@ -22,6 +22,7 @@ export function Scorecard({ game, currentUserId }: ScorecardProps) {
   const [scores, setScores] = useState<Score[]>(game.scores);
   const [pendingUpdates, setPendingUpdates] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const currentPlayer = game.players.find((p) => p.user_id === currentUserId);
 
@@ -83,6 +84,7 @@ export function Scorecard({ game, currentUserId }: ScorecardProps) {
 
       // Mark as pending
       setPendingUpdates((prev) => new Set(prev).add(key));
+      setSaveError(null);
 
       // Server update
       startTransition(async () => {
@@ -101,8 +103,11 @@ export function Scorecard({ game, currentUserId }: ScorecardProps) {
         });
 
         if (result.error) {
-          // Revert on error
+          // Revert on error and show message
           setScores(game.scores);
+          setSaveError(result.error || 'Failed to save score. Please try again.');
+          // Auto-clear error after 5 seconds
+          setTimeout(() => setSaveError(null), 5000);
         }
       });
     },
@@ -179,6 +184,13 @@ export function Scorecard({ game, currentUserId }: ScorecardProps) {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Save Error Banner */}
+      {saveError && (
+        <div className="rounded-lg border border-red-800 bg-red-900/20 p-3 text-sm text-red-400">
+          {saveError}
+        </div>
       )}
 
       {/* Scorecard */}
@@ -294,7 +306,7 @@ export function Scorecard({ game, currentUserId }: ScorecardProps) {
                               onChange={(strokes) =>
                                 handleScoreChange(player.id, hole, strokes)
                               }
-                              disabled={!isCurrentUser && !isCurrentUser}
+                              disabled={!isCurrentUser}
                               isPending={isPendingScore}
                               highlight={wonSkin}
                             />

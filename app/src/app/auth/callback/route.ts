@@ -37,7 +37,7 @@ export async function GET(request: Request) {
               id: user.id,
               email: user.email!,
               full_name: user.user_metadata?.full_name || null,
-              account_type: user.user_metadata?.account_type || 'player',
+              account_type: 'player',
             })
             .select('account_type')
             .single();
@@ -61,7 +61,11 @@ export async function GET(request: Request) {
       }
 
       // Regular player - use redirect param or dashboard
-      return NextResponse.redirect(`${origin}${redirect || '/dashboard'}`);
+      // Validate redirect is a relative path to prevent open redirect attacks
+      const safeRedirect = redirect && redirect.startsWith('/') && !redirect.startsWith('//')
+        ? redirect
+        : '/dashboard';
+      return NextResponse.redirect(`${origin}${safeRedirect}`);
     }
     console.error('Auth callback error:', error.message);
     return NextResponse.redirect(

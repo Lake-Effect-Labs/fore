@@ -26,37 +26,38 @@ export async function updateScore(input: UpdateScoreInput) {
     return { error: 'Not a player in this game' };
   }
 
-  // Check if score already exists
-  const { data: existingScore } = await supabase
-    .from('scores')
-    .select('id')
+  // Verify the player_id being scored belongs to the authenticated user
+  // This prevents IDOR where a player could modify another player's score
+  const { data: targetPlayer } = await supabase
+    .from('game_players')
+    .select('user_id')
     .eq('game_id', input.game_id)
-    .eq('player_id', input.player_id)
-    .eq('hole_number', input.hole_number)
+    .eq('id', input.player_id)
     .single();
 
-  if (existingScore) {
-    // Update existing score
-    const { error } = await supabase
-      .from('scores')
-      .update({ strokes: input.strokes })
-      .eq('id', existingScore.id);
+  if (!targetPlayer || targetPlayer.user_id !== user.id) {
+    return { error: 'You can only update your own scores' };
+  }
 
-    if (error) {
-      return { error: error.message };
-    }
-  } else {
-    // Insert new score
-    const { error } = await supabase.from('scores').insert({
-      game_id: input.game_id,
-      player_id: input.player_id,
-      hole_number: input.hole_number,
-      strokes: input.strokes,
-    });
+  // TODO: This requires a unique constraint on (game_id, player_id, hole_number) in the DB.
+  // Using upsert to avoid check-then-act race condition where two concurrent
+  // requests could both see "no existing score" and both insert.
+  const { error } = await supabase
+    .from('scores')
+    .upsert(
+      {
+        game_id: input.game_id,
+        player_id: input.player_id,
+        hole_number: input.hole_number,
+        strokes: input.strokes,
+      },
+      {
+        onConflict: 'game_id,player_id,hole_number',
+      }
+    );
 
-    if (error) {
-      return { error: error.message };
-    }
+  if (error) {
+    return { error: error.message };
   }
 
   revalidatePath(`/games/${input.game_id}`);
@@ -88,18 +89,22 @@ export async function updateMultipleScores(
     return { error: 'Not a player in this game' };
   }
 
-  // Process each score
-  for (const score of scores) {
-    const result = await updateScore({
-      game_id: gameId,
-      player_id: score.playerId,
-      hole_number: score.holeNumber,
-      strokes: score.strokes,
+  // Batch upsert all scores in a single query instead of N+1 individual calls
+  const upsertData = scores.map((score) => ({
+    game_id: gameId,
+    player_id: score.playerId,
+    hole_number: score.holeNumber,
+    strokes: score.strokes,
+  }));
+
+  const { error } = await supabase
+    .from('scores')
+    .upsert(upsertData, {
+      onConflict: 'game_id,player_id,hole_number',
     });
 
-    if (result.error) {
-      return { error: result.error };
-    }
+  if (error) {
+    return { error: error.message };
   }
 
   revalidatePath(`/games/${gameId}`);
@@ -108,6 +113,25 @@ export async function updateMultipleScores(
 
 export async function getScoresForGame(gameId: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Verify user is a player in this game
+  const { data: player } = await supabase
+    .from('game_players')
+    .select('id')
+    .eq('game_id', gameId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!player) {
+    return { error: 'Not a player in this game' };
+  }
 
   const { data: scores, error } = await supabase
     .from('scores')
@@ -142,6 +166,19 @@ export async function deleteScore(gameId: string, playerId: string, holeNumber: 
 
   if (!player) {
     return { error: 'Not a player in this game' };
+  }
+
+  // Verify the player_id being deleted belongs to the authenticated user
+  // This prevents IDOR where a player could delete another player's score
+  const { data: targetPlayer } = await supabase
+    .from('game_players')
+    .select('user_id')
+    .eq('game_id', gameId)
+    .eq('id', playerId)
+    .single();
+
+  if (!targetPlayer || targetPlayer.user_id !== user.id) {
+    return { error: 'You can only delete your own scores' };
   }
 
   const { error } = await supabase

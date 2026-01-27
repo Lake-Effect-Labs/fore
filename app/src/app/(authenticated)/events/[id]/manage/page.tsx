@@ -126,7 +126,9 @@ export default async function EventManagePage({ params, searchParams }: PageProp
       <ManageTabs
         event={event}
         eventUrl={eventUrl}
-        registrations={registrations}
+        registrations={registrations.filter(
+          (r): r is typeof r & { profile: NonNullable<typeof r.profile> } => r.profile !== null
+        )}
         groups={groups}
         initialTab={tab || 'overview'}
       />

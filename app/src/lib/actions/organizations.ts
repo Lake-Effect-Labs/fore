@@ -151,6 +151,21 @@ export async function getOrganizationMembers(
   orgId: string
 ): Promise<(OrganizationMember & { profile: { id: string; email: string; full_name: string | null; avatar_url: string | null } })[]> {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  // Verify user is a member of this organization
+  const { data: membership } = await supabase
+    .from('organization_members')
+    .select('role')
+    .eq('organization_id', orgId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!membership) return [];
 
   const { data } = await supabase
     .from('organization_members')

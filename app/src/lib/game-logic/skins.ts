@@ -59,9 +59,19 @@ export function calculateSkins(
     }
 
     // Find lowest score
-    const lowestScore = Math.min(
-      ...holeData.filter((s) => s.strokes !== null).map((s) => s.strokes!)
-    );
+    const validScores = holeData.filter((s) => s.strokes !== null);
+    if (validScores.length === 0) {
+      // All scores are null for this hole
+      results.push({
+        hole,
+        winner_id: null,
+        value: currentValue,
+        carried: false,
+      });
+      continue;
+    }
+
+    const lowestScore = Math.min(...validScores.map((s) => s.strokes!));
 
     // Find players with lowest score
     const winners = holeData.filter((s) => s.strokes === lowestScore);

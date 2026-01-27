@@ -53,14 +53,19 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith(path)
   );
 
+  // Fetch profile ONCE for routes that need account_type check
+  // (instead of two separate queries for player-only and auth routes)
+  const needsProfileCheck = user && (isPlayerOnlyPath || request.nextUrl.pathname === '/auth');
+  const profile = needsProfileCheck
+    ? (await supabase
+        .from('profiles')
+        .select('account_type')
+        .eq('id', user.id)
+        .single()).data
+    : null;
+
   // Check if course admin is trying to access player routes
   if (isPlayerOnlyPath && user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('account_type')
-      .eq('id', user.id)
-      .single();
-
     if (profile?.account_type === 'course_admin') {
       const url = request.nextUrl.clone();
       url.pathname = '/admin';
@@ -70,13 +75,6 @@ export async function middleware(request: NextRequest) {
 
   // Redirect logged-in users away from auth page
   if (request.nextUrl.pathname === '/auth' && user) {
-    // Check account type for proper redirect
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('account_type')
-      .eq('id', user.id)
-      .single();
-
     const url = request.nextUrl.clone();
     url.pathname = profile?.account_type === 'course_admin' ? '/admin' : '/dashboard';
     return NextResponse.redirect(url);

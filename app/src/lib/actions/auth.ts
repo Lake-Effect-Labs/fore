@@ -160,6 +160,7 @@ export async function getProfile(): Promise<{
   email: string;
   full_name: string | null;
   display_name: string | null;
+  phone: string | null;
   avatar_url: string | null;
   handicap: number | null;
   account_type: 'player' | 'course_admin';
@@ -184,6 +185,7 @@ export async function getProfile(): Promise<{
     email: string;
     full_name: string | null;
     display_name: string | null;
+    phone: string | null;
     avatar_url: string | null;
     handicap: number | null;
     account_type: 'player' | 'course_admin';

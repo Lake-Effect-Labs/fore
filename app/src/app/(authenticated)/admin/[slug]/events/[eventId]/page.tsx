@@ -270,7 +270,7 @@ export default async function AdminEventDetailPage({ params }: PageProps) {
                   className="flex items-center justify-between rounded-lg bg-[#002418] px-3 py-2"
                 >
                   <span className="text-sm text-[#e8f5f0]">
-                    {reg.profile.full_name || reg.profile.email}
+                    {reg.profile?.full_name || reg.profile?.email || 'Unknown'}
                   </span>
                   <div className="flex items-center gap-2">
                     <Badge variant={reg.status === 'confirmed' ? 'success' : 'secondary'}>

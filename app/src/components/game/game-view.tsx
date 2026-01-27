@@ -30,6 +30,9 @@ const formatLabels: Record<GameFormat, string> = {
   skins: 'Skins',
   nassau: 'Nassau',
   match_play: 'Match Play',
+  wolf: 'Wolf',
+  best_ball: 'Best Ball',
+  bingo_bango_bongo: 'Bingo Bango Bongo',
 };
 
 interface GameViewProps {
@@ -40,6 +43,7 @@ interface GameViewProps {
 export function GameView({ game, currentUserId }: GameViewProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const isCreator = game.created_by === currentUserId;
   const currentPlayer = game.players.find((p) => p.user_id === currentUserId);
@@ -48,26 +52,54 @@ export function GameView({ game, currentUserId }: GameViewProps) {
 
   const handleStart = async () => {
     setIsLoading(true);
-    await startGame(game.id);
-    setIsLoading(false);
-    router.refresh();
+    setError('');
+    try {
+      const result = await startGame(game.id);
+      if (result?.error) {
+        setError(result.error);
+      } else {
+        router.refresh();
+      }
+    } catch {
+      setError('Failed to start game. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleComplete = async () => {
     setIsLoading(true);
-    await completeGame(game.id);
-    setIsLoading(false);
-    router.refresh();
+    setError('');
+    try {
+      const result = await completeGame(game.id);
+      if (result?.error) {
+        setError(result.error);
+      } else {
+        router.refresh();
+      }
+    } catch {
+      setError('Failed to complete game. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleRespond = async (response: 'accepted' | 'declined') => {
     setIsLoading(true);
-    await respondToInvite(game.id, response);
-    setIsLoading(false);
-    if (response === 'declined') {
-      router.push('/dashboard');
-    } else {
-      router.refresh();
+    setError('');
+    try {
+      const result = await respondToInvite(game.id, response);
+      if (result?.error) {
+        setError(result.error);
+      } else if (response === 'declined') {
+        router.push('/dashboard');
+      } else {
+        router.refresh();
+      }
+    } catch {
+      setError('Failed to respond to invite. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -82,6 +114,15 @@ export function GameView({ game, currentUserId }: GameViewProps) {
     }
     if (game.format === 'match_play') {
       return `$${game.config.match_bet} match`;
+    }
+    if (game.format === 'wolf') {
+      return game.config.wolf_value ? `$${game.config.wolf_value}/pt` : '';
+    }
+    if (game.format === 'best_ball') {
+      return game.config.best_ball_bet ? `$${game.config.best_ball_bet}/team` : '';
+    }
+    if (game.format === 'bingo_bango_bongo') {
+      return game.config.bingo_value ? `$${game.config.bingo_value}/$${game.config.bango_value}/$${game.config.bongo_value}` : '';
     }
     return '';
   };
@@ -196,6 +237,16 @@ export function GameView({ game, currentUserId }: GameViewProps) {
                 Accept
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Error Banner */}
+      {error && (
+        <Card className="mb-6 border-red-800 bg-red-900/20">
+          <CardContent className="flex items-center gap-3 p-4">
+            <X className="h-5 w-5 text-red-400 flex-shrink-0" />
+            <p className="text-sm text-red-400">{error}</p>
           </CardContent>
         </Card>
       )}

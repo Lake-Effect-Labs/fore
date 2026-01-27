@@ -31,34 +31,47 @@ export function EventScoring({
   const [scores, setScores] = useState<Record<number, number>>(initialScores);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleScoreChange = async (holeNumber: number, strokes: number) => {
     // Optimistic update
+    const previousScores = { ...scores };
     setScores(prev => ({ ...prev, [holeNumber]: strokes }));
     setIsSaved(false);
+    setSaveError(null);
 
-    // Submit to server
-    const result = await submitEventScore(eventId, registrationId, holeNumber, strokes);
+    try {
+      // Submit to server
+      const result = await submitEventScore(eventId, registrationId, holeNumber, strokes);
 
-    if (result.error) {
-      // Revert on error
-      setScores(prev => {
-        const next = { ...prev };
-        delete next[holeNumber];
-        return next;
-      });
-    } else {
-      // Refresh to update leaderboard
-      router.refresh();
+      if (result.error) {
+        // Revert on error
+        setScores(previousScores);
+        setSaveError(result.error || 'Failed to save score. Please try again.');
+        setTimeout(() => setSaveError(null), 5000);
+      } else {
+        // Refresh to update leaderboard
+        router.refresh();
+      }
+    } catch {
+      setScores(previousScores);
+      setSaveError('Failed to save score. Please check your connection.');
+      setTimeout(() => setSaveError(null), 5000);
     }
   };
 
   const handleRefreshLeaderboard = async () => {
     setIsSubmitting(true);
-    await recalculateLeaderboard(eventId);
-    router.refresh();
-    setIsSubmitting(false);
-    setIsSaved(true);
+    setSaveError(null);
+    try {
+      await recalculateLeaderboard(eventId);
+      router.refresh();
+      setIsSaved(true);
+    } catch {
+      setSaveError('Failed to refresh leaderboard. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const holesCompleted = Object.keys(scores).length;
@@ -67,6 +80,13 @@ export function EventScoring({
 
   return (
     <div className="space-y-4">
+      {/* Save Error Banner */}
+      {saveError && (
+        <div className="rounded-lg border border-red-800 bg-red-900/20 p-3 text-sm text-red-400">
+          {saveError}
+        </div>
+      )}
+
       <RoundScorecard
         holes={holes}
         scores={scores}

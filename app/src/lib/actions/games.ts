@@ -40,26 +40,26 @@ export async function createGame(input: CreateGameInput) {
   const { error: configError } = await supabase.from('game_configs').insert({
     game_id: game.id,
     // Skins
-    skin_value: input.config.skin_value || null,
+    skin_value: input.config.skin_value ?? null,
     carry_over: input.config.carry_over ?? true,
     // Nassau
-    front_nine_bet: input.config.front_nine_bet || null,
-    back_nine_bet: input.config.back_nine_bet || null,
-    overall_bet: input.config.overall_bet || null,
+    front_nine_bet: input.config.front_nine_bet ?? null,
+    back_nine_bet: input.config.back_nine_bet ?? null,
+    overall_bet: input.config.overall_bet ?? null,
     auto_press: input.config.auto_press ?? false,
-    press_after_down: input.config.press_after_down || 2,
+    press_after_down: input.config.press_after_down ?? 2,
     // Match Play
-    match_bet: input.config.match_bet || null,
+    match_bet: input.config.match_bet ?? null,
     // Wolf
-    wolf_value: input.config.wolf_value || null,
+    wolf_value: input.config.wolf_value ?? null,
     lone_wolf_multiplier: input.config.lone_wolf_multiplier ?? 2,
     blind_wolf_multiplier: input.config.blind_wolf_multiplier ?? 3,
     // Best Ball
-    best_ball_bet: input.config.best_ball_bet || null,
+    best_ball_bet: input.config.best_ball_bet ?? null,
     // Bingo Bango Bongo
-    bingo_value: input.config.bingo_value || null,
-    bango_value: input.config.bango_value || null,
-    bongo_value: input.config.bongo_value || null,
+    bingo_value: input.config.bingo_value ?? null,
+    bango_value: input.config.bango_value ?? null,
+    bongo_value: input.config.bongo_value ?? null,
   });
 
   if (configError) {
@@ -108,40 +108,51 @@ export async function createGame(input: CreateGameInput) {
 
 export async function getGame(gameId: string): Promise<GameWithDetails | null> {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const { data: game, error } = await supabase
-    .from('games')
-    .select('*')
-    .eq('id', gameId)
-    .single();
+  if (!user) return null;
+
+  // Verify user is a participant and fetch game in parallel
+  const [{ data: game, error }, { data: participant }] = await Promise.all([
+    supabase
+      .from('games')
+      .select('*')
+      .eq('id', gameId)
+      .single(),
+    supabase
+      .from('game_players')
+      .select('id')
+      .eq('game_id', gameId)
+      .eq('user_id', user.id)
+      .single(),
+  ]);
 
   if (error || !game) return null;
+  if (!participant) return null;
 
-  // Get config
-  const { data: config } = await supabase
-    .from('game_configs')
-    .select('*')
-    .eq('game_id', gameId)
-    .single();
-
-  // Get players with profiles
-  const { data: players } = await supabase
-    .from('game_players')
-    .select('*, profile:profiles(*)')
-    .eq('game_id', gameId);
-
-  // Get scores
-  const { data: scores } = await supabase
-    .from('scores')
-    .select('*')
-    .eq('game_id', gameId)
-    .order('hole_number', { ascending: true });
-
-  // Get settlements
-  const { data: settlements } = await supabase
-    .from('settlements')
-    .select('*')
-    .eq('game_id', gameId);
+  // Batch-fetch config, players, scores, and settlements in parallel
+  const [{ data: config }, { data: players }, { data: scores }, { data: settlements }] = await Promise.all([
+    supabase
+      .from('game_configs')
+      .select('*')
+      .eq('game_id', gameId)
+      .single(),
+    supabase
+      .from('game_players')
+      .select('*, profile:profiles(id, email, full_name, display_name, avatar_url, handicap)')
+      .eq('game_id', gameId),
+    supabase
+      .from('scores')
+      .select('*')
+      .eq('game_id', gameId)
+      .order('hole_number', { ascending: true }),
+    supabase
+      .from('settlements')
+      .select('*')
+      .eq('game_id', gameId),
+  ]);
 
   return {
     ...game,
@@ -163,11 +174,12 @@ export async function getMyGames(): Promise<GameWithPlayers[]> {
 
   if (!user) return [];
 
-  // Get games where user is a player
+  // Get games where user is a player (limit to most recent 100 games)
   const { data: gameIds } = await supabase
     .from('game_players')
     .select('game_id')
-    .eq('user_id', user.id);
+    .eq('user_id', user.id)
+    .limit(100);
 
   if (!gameIds || gameIds.length === 0) return [];
 
@@ -177,40 +189,65 @@ export async function getMyGames(): Promise<GameWithPlayers[]> {
     .from('games')
     .select('*')
     .in('id', ids)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(50);
 
-  if (!games) return [];
+  if (!games || games.length === 0) return [];
 
-  // Get configs and players for each game
-  const result: GameWithPlayers[] = [];
+  // Batch-fetch configs and players for all games to avoid N+1 queries
+  const [{ data: allConfigs }, { data: allPlayers }] = await Promise.all([
+    supabase.from('game_configs').select('*').in('game_id', ids),
+    supabase.from('game_players').select('*, profile:profiles(*)').in('game_id', ids),
+  ]);
 
-  for (const game of games) {
-    const { data: config } = await supabase
-      .from('game_configs')
-      .select('*')
-      .eq('game_id', game.id)
-      .single();
-
-    const { data: players } = await supabase
-      .from('game_players')
-      .select('*, profile:profiles(*)')
-      .eq('game_id', game.id);
-
-    result.push({
-      ...game,
-      config: config || null,
-      players: (players || []).map((p) => ({
-        ...p,
-        profile: p.profile,
-      })),
-    } as GameWithPlayers);
+  const configsByGameId = new Map(
+    (allConfigs || []).map((c) => [c.game_id, c])
+  );
+  const playersByGameId = new Map<string, typeof allPlayers>();
+  for (const player of allPlayers || []) {
+    const existing = playersByGameId.get(player.game_id) || [];
+    existing.push(player);
+    playersByGameId.set(player.game_id, existing);
   }
 
-  return result;
+  return games.map((game) => ({
+    ...game,
+    config: configsByGameId.get(game.id) || null,
+    players: (playersByGameId.get(game.id) || []).map((p: any) => ({
+      ...p,
+      profile: p.profile,
+    })),
+  })) as GameWithPlayers[];
 }
 
 export async function startGame(gameId: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Verify game exists and is in pending status before transitioning
+  const { data: game } = await supabase
+    .from('games')
+    .select('status, created_by')
+    .eq('id', gameId)
+    .single();
+
+  if (!game) {
+    return { error: 'Game not found' };
+  }
+
+  if (game.status !== 'pending') {
+    return { error: `Cannot start a game that is ${game.status}` };
+  }
+
+  if (game.created_by !== user.id) {
+    return { error: 'Only the game creator can start the game' };
+  }
 
   const { error } = await supabase
     .from('games')
@@ -218,7 +255,8 @@ export async function startGame(gameId: string) {
       status: 'active',
       started_at: new Date().toISOString(),
     })
-    .eq('id', gameId);
+    .eq('id', gameId)
+    .eq('status', 'pending'); // Guard against race condition
 
   if (error) {
     return { error: error.message };
@@ -230,6 +268,32 @@ export async function startGame(gameId: string) {
 
 export async function completeGame(gameId: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Verify game exists and is in active status before transitioning
+  const { data: game } = await supabase
+    .from('games')
+    .select('status, created_by')
+    .eq('id', gameId)
+    .single();
+
+  if (!game) {
+    return { error: 'Game not found' };
+  }
+
+  if (game.status !== 'active') {
+    return { error: `Cannot complete a game that is ${game.status}` };
+  }
+
+  if (game.created_by !== user.id) {
+    return { error: 'Only the game creator can complete the game' };
+  }
 
   const { error } = await supabase
     .from('games')
@@ -237,7 +301,8 @@ export async function completeGame(gameId: string) {
       status: 'completed',
       completed_at: new Date().toISOString(),
     })
-    .eq('id', gameId);
+    .eq('id', gameId)
+    .eq('status', 'active'); // Guard against race condition
 
   if (error) {
     return { error: error.message };

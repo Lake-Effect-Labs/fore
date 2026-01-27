@@ -16,39 +16,55 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
 
   const [fullName, setFullName] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [handicap, setHandicap] = useState('');
 
   useEffect(() => {
-    getProfile().then((p) => {
-      setProfile(p);
-      setFullName(p?.full_name || '');
-      setDisplayName(p?.display_name || '');
-      setHandicap(p?.handicap?.toString() || '');
-      setIsLoading(false);
-    });
+    getProfile()
+      .then((p) => {
+        setProfile(p);
+        setFullName(p?.full_name || '');
+        setDisplayName(p?.display_name || '');
+        setHandicap(p?.handicap?.toString() || '');
+      })
+      .catch(() => {
+        setMessage('Failed to load profile. Please refresh the page.');
+        setIsError(true);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     setMessage('');
+    setIsError(false);
 
-    const result = await updateProfile({
-      full_name: fullName || undefined,
-      display_name: displayName || undefined,
-      handicap: handicap ? parseFloat(handicap) : undefined,
-    });
+    try {
+      const result = await updateProfile({
+        full_name: fullName || undefined,
+        display_name: displayName || undefined,
+        handicap: handicap ? parseFloat(handicap) : undefined,
+      });
 
-    setIsSaving(false);
-
-    if (result.error) {
-      setMessage(result.error);
-    } else {
-      setMessage('Profile updated successfully');
-      router.refresh();
+      if (result.error) {
+        setMessage(result.error);
+        setIsError(true);
+      } else {
+        setMessage('Profile updated successfully');
+        setIsError(false);
+        router.refresh();
+      }
+    } catch {
+      setMessage('Failed to update profile. Please try again.');
+      setIsError(true);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -66,7 +82,7 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
-      <h1 className="mb-8 text-2xl font-bold text-slate-900">Profile</h1>
+      <h1 className="mb-8 text-2xl font-bold text-[#e8f5f0]">Profile</h1>
 
       <Card>
         <CardHeader>
@@ -89,7 +105,7 @@ export default function ProfilePage() {
             <div>
               <label
                 htmlFor="fullName"
-                className="block text-sm font-medium text-slate-700"
+                className="block text-sm font-medium text-[#a8d4c0]"
               >
                 Full Name
               </label>
@@ -105,7 +121,7 @@ export default function ProfilePage() {
             <div>
               <label
                 htmlFor="displayName"
-                className="block text-sm font-medium text-slate-700"
+                className="block text-sm font-medium text-[#a8d4c0]"
               >
                 Display Name
               </label>
@@ -116,7 +132,7 @@ export default function ProfilePage() {
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Johnny"
               />
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-[#a8d4c0]/70">
                 This is how you&apos;ll appear in games
               </p>
             </div>
@@ -124,7 +140,7 @@ export default function ProfilePage() {
             <div>
               <label
                 htmlFor="handicap"
-                className="block text-sm font-medium text-slate-700"
+                className="block text-sm font-medium text-[#a8d4c0]"
               >
                 Handicap Index
               </label>
@@ -139,7 +155,7 @@ export default function ProfilePage() {
                 onChange={(e) => setHandicap(e.target.value)}
                 placeholder="15.4"
               />
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-[#a8d4c0]/70">
                 Optional - used for handicapped games
               </p>
             </div>
@@ -147,9 +163,9 @@ export default function ProfilePage() {
             {message && (
               <div
                 className={`rounded-lg p-3 text-sm ${
-                  message.includes('error')
-                    ? 'bg-red-50 text-red-600'
-                    : 'bg-green-50 text-green-600'
+                  isError
+                    ? 'bg-red-900/20 border border-red-800 text-red-400'
+                    : 'bg-green-900/20 border border-green-800 text-green-400'
                 }`}
               >
                 {message}

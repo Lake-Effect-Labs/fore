@@ -221,7 +221,7 @@ export function EventsClient({ publicEvents, myEvents }: EventsClientProps) {
                             </Badge>
                           )}
                           {event.entry_fee && (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="secondary" className="text-xs">
                               ${event.entry_fee}
                             </Badge>
                           )}
@@ -230,7 +230,7 @@ export function EventsClient({ publicEvents, myEvents }: EventsClientProps) {
                     </div>
                     <div className="mt-4">
                       {hasRegistered ? (
-                        <Button variant="outline" size="sm" disabled className="w-full">
+                        <Button variant="secondary" size="sm" disabled className="w-full">
                           <Check className="mr-2 h-4 w-4 text-emerald-500" />
                           Registered
                         </Button>

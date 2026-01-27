@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { createLeague } from '@/lib/actions/leagues';
+import type { LeagueSettings } from '@/types/b2b';
 
 interface CreateLeagueFormProps {
   organizationId: string;
@@ -138,13 +139,13 @@ export function CreateLeagueForm({ organizationId, slug }: CreateLeagueFormProps
     setIsLoading(true);
 
     // Build settings object
-    const settings = {
-      handicap_mode: handicapMode,
+    const settings: LeagueSettings = {
+      handicap_mode: handicapMode as LeagueSettings['handicap_mode'],
       handicap_rounds: handicapMode === 'league_rounds' ? parseInt(handicapRounds) : null,
       max_handicap: parseInt(maxHandicap),
-      scoring_type: scoringType,
-      points_system: pointsSystem,
-      team_format: teamFormat,
+      scoring_type: scoringType as LeagueSettings['scoring_type'],
+      points_system: pointsSystem as LeagueSettings['points_system'],
+      team_format: teamFormat as LeagueSettings['team_format'],
       players_per_team: teamFormat !== 'individual' ? parseInt(playersPerTeam) : null,
       use_divisions: useDivisions,
       number_of_divisions: useDivisions ? parseInt(numberOfDivisions) : null,

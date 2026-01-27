@@ -90,7 +90,11 @@ export default function NewGamePage() {
   const [selectedPlayers, setSelectedPlayers] = useState<Profile[]>([]);
 
   useEffect(() => {
-    getFriends().then(setFriends);
+    getFriends()
+      .then(setFriends)
+      .catch(() => {
+        // Friends list failed to load - user can still search
+      });
   }, []);
 
   const handleSearch = async (query: string) => {

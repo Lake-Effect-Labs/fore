@@ -12,6 +12,9 @@ const formatLabels: Record<GameFormat, string> = {
   skins: 'Skins',
   nassau: 'Nassau',
   match_play: 'Match Play',
+  wolf: 'Wolf',
+  best_ball: 'Best Ball',
+  bingo_bango_bongo: 'Bingo Bango Bongo',
 };
 
 const statusColors: Record<GameStatus, 'default' | 'warning' | 'success' | 'secondary'> = {
@@ -87,7 +90,7 @@ export default async function DashboardPage() {
             ))}
           </div>
           {leagues.length > 3 && (
-            <Link href="/my-leagues" className="mt-4 inline-block text-sm text-[#c9a962] hover:underline">
+            <Link href="/leagues" className="mt-4 inline-block text-sm text-[#c9a962] hover:underline">
               View all {leagues.length} leagues →
             </Link>
           )}
