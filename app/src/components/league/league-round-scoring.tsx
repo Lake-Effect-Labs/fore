@@ -19,7 +19,7 @@ interface LeagueRoundScoringProps {
     notes?: string | null;
   }[];
   initialScores: Record<number, number>;
-  leagueId: string;
+  leagueId?: string;
   seasonId: string;
 }
 
@@ -28,7 +28,6 @@ export function LeagueRoundScoring({
   participantId,
   holes,
   initialScores,
-  leagueId,
   seasonId,
 }: LeagueRoundScoringProps) {
   const router = useRouter();

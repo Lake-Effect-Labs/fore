@@ -9,7 +9,6 @@ import { getOrganizerEvents } from '@/lib/actions/events';
 import type { Event } from '@/types/b2b';
 import {
   Calendar,
-  MapPin,
   Users,
   DollarSign,
   Settings,
@@ -17,7 +16,6 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  Plus,
 } from 'lucide-react';
 
 type OrganizerEvent = Event & { organization?: { name: string; slug: string } };
@@ -64,7 +62,6 @@ export default function OrganizerDashboardPage() {
 
   const EventCard = ({ event }: { event: OrganizerEvent }) => {
     const eventDate = new Date(event.event_date);
-    const isUpcoming = eventDate >= new Date();
     const eventUrl = event.slug && event.organization
       ? `/${event.organization.slug}/${event.slug}`
       : null;
@@ -192,7 +189,7 @@ export default function OrganizerDashboardPage() {
           My Events
         </h1>
         <p className="mt-1 text-sm sm:text-base text-[#a8d4c0]">
-          Manage the events you're organizing
+          Manage the events you&apos;re organizing
         </p>
       </div>
 
@@ -233,7 +230,7 @@ export default function OrganizerDashboardPage() {
               No events yet
             </h3>
             <p className="text-sm text-[#a8d4c0] mt-2 max-w-sm mx-auto">
-              You haven't been assigned as an organizer for any events yet.
+              You haven&apos;t been assigned as an organizer for any events yet.
               Contact a course to get started organizing an outing.
             </p>
           </CardContent>

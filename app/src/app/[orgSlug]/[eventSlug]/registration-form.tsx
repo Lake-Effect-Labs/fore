@@ -126,7 +126,7 @@ export function EventRegistrationForm({
             <div className="rounded-lg border border-[#004d35] p-4 space-y-3">
               <p className="text-sm font-medium text-[#e8f5f0]">Add a teammate</p>
               <p className="text-xs text-[#a8d4c0]">
-                They don't need a Fore account - just enter their info and they'll be added to your group.
+                They don&apos;t need a Fore account - just enter their info and they&apos;ll be added to your group.
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>

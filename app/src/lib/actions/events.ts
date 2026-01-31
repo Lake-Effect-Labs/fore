@@ -11,7 +11,6 @@ import type {
   EventLeaderboard,
   Flight,
   EventStatus,
-  EventVisibility,
   PaymentStatus,
 } from '@/types/b2b';
 import { getUserRole } from './organizations';

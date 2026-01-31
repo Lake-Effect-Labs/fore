@@ -13,7 +13,6 @@ import {
   CheckCircle,
   Circle,
   Users,
-  Clock,
   DollarSign,
   AlertCircle,
   UserCheck,
@@ -33,7 +32,7 @@ interface Group {
 }
 
 interface CheckInListProps {
-  eventId: string;
+  eventId?: string;
   registrations: (EventRegistration & {
     profile: {
       id: string;
@@ -43,10 +42,10 @@ interface CheckInListProps {
       handicap: number | null;
     } | null;
   })[];
-  groups: Group[];
+  groups?: Group[];
 }
 
-export function CheckInList({ eventId, registrations, groups }: CheckInListProps) {
+export function CheckInList({ registrations }: CheckInListProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingId, setLoadingId] = useState<string | null>(null);

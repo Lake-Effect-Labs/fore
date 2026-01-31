@@ -321,7 +321,8 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Pro
     const existingSettings = (org.settings as Record<string, unknown>) || {};
 
     // Remove subscription from settings and downgrade to free
-    const { subscription: _removed, ...restSettings } = existingSettings;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { subscription: _, ...restSettings } = existingSettings;
 
     const { error: orgError } = await supabase
       .from('organizations')

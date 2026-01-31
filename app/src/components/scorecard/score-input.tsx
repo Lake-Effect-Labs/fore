@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 
@@ -20,12 +20,12 @@ export function ScoreInput({
   highlight = false,
 }: ScoreInputProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [localValue, setLocalValue] = useState<string>(value?.toString() || '');
+  // Track the value we're editing separately from the initial state
+  const [editValue, setEditValue] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    setLocalValue(value?.toString() || '');
-  }, [value]);
+  // Derive display value from props, not local state
+  const displayValue = useMemo(() => value?.toString() || '', [value]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -36,20 +36,22 @@ export function ScoreInput({
 
   const handleClick = () => {
     if (!disabled) {
+      // Initialize edit value from current value when starting to edit
+      setEditValue(displayValue);
       setIsEditing(true);
     }
   };
 
   const handleBlur = () => {
     setIsEditing(false);
-    const numValue = parseInt(localValue, 10);
+    const numValue = parseInt(editValue, 10);
     if (!isNaN(numValue) && numValue >= 1 && numValue <= 20) {
       if (numValue !== value) {
         onChange(numValue);
       }
-    } else {
-      setLocalValue(value?.toString() || '');
     }
+    // Reset edit value
+    setEditValue('');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -57,7 +59,7 @@ export function ScoreInput({
       inputRef.current?.blur();
     }
     if (e.key === 'Escape') {
-      setLocalValue(value?.toString() || '');
+      setEditValue('');
       setIsEditing(false);
     }
     // Allow only numbers
@@ -75,7 +77,7 @@ export function ScoreInput({
     const val = e.target.value;
     // Only allow 1-2 digit numbers
     if (val === '' || /^\d{1,2}$/.test(val)) {
-      setLocalValue(val);
+      setEditValue(val);
     }
   };
 
@@ -90,7 +92,7 @@ export function ScoreInput({
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
-          value={localValue}
+          value={editValue}
           onChange={handleChange}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
@@ -108,7 +110,7 @@ export function ScoreInput({
               type="button"
               onMouseDown={(e) => {
                 e.preventDefault();
-                setLocalValue(score.toString());
+                setEditValue(score.toString());
                 onChange(score);
                 setIsEditing(false);
               }}

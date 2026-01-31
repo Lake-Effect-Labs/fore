@@ -24,14 +24,10 @@ interface BingoBangoBongoResult {
  */
 export function calculateBingoBangoBongo(
   scores: Score[],
-  config: GameConfig,
+  _config: GameConfig,
   holes: number
 ): BingoBangoBongoResult[] {
-  const bingoValue = config.bingo_value ?? 1;
-  const bangoValue = config.bango_value ?? 1;
-  const bongoValue = config.bongo_value ?? 1;
-  const pointValue = bingoValue + bangoValue + bongoValue;
-
+  // Note: Point values in config are used in settlements, not here
   const pointsMap = new Map<string, { bingos: number; bangos: number; bongos: number }>();
 
   for (let hole = 1; hole <= holes; hole++) {

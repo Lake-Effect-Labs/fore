@@ -4,7 +4,6 @@ import type {
   GameConfig,
   Score,
   GamePlayerWithProfile,
-  GameFormat,
 } from '@/types/database';
 
 interface GameState {

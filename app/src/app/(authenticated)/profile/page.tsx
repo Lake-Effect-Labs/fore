@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Avatar } from '@/components/ui/avatar';
 import { getProfile, updateProfile } from '@/lib/actions';
 import type { Profile } from '@/types/database';
-import { User, Save } from 'lucide-react';
+import { Save } from 'lucide-react';
 
 export default function ProfilePage() {
   const router = useRouter();

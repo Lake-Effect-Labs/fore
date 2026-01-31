@@ -2,9 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
 import { assignGroupStartingHole } from '@/lib/actions/events';
-import { Users, Flag, X, Check } from 'lucide-react';
+import { Users, Flag, X } from 'lucide-react';
 
 interface Group {
   groupNumber: number;

@@ -9,7 +9,7 @@ import {
   getEventLeaderboard,
 } from '@/lib/actions/events';
 import { getFacilityHoles } from '@/lib/actions/facilities';
-import { ArrowLeft, Calendar, MapPin, Trophy, Users } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Trophy } from 'lucide-react';
 import { EventScoring } from '@/components/event/event-scoring';
 
 interface PageProps {

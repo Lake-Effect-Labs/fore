@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -21,47 +21,28 @@ export interface NavItem {
   exact?: boolean;
 }
 
-interface AppShellProps {
-  children: React.ReactNode;
+interface SidebarContentProps {
+  isMobile?: boolean;
+  collapsed: boolean;
+  setCollapsed: (collapsed: boolean) => void;
+  setMobileOpen: (open: boolean) => void;
   navItems: NavItem[];
-  homeHref?: string;
-  title?: string;
+  homeHref: string;
+  title: string;
+  isActive: (href: string, exact?: boolean) => boolean;
 }
 
-export function AppShell({
-  children,
+function SidebarContent({
+  isMobile = false,
+  collapsed,
+  setCollapsed,
+  setMobileOpen,
   navItems,
-  homeHref = '/dashboard',
-  title = 'Fore',
-}: AppShellProps) {
-  const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  // Close mobile menu on route change
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
-
-  // Close mobile menu on resize to desktop
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 768) {
-        setMobileOpen(false);
-      }
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const isActive = (href: string, exact?: boolean) => {
-    if (exact) {
-      return pathname === href;
-    }
-    return pathname.startsWith(href);
-  };
-
-  const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
+  homeHref,
+  title,
+  isActive,
+}: SidebarContentProps) {
+  return (
     <div className="flex h-full flex-col">
       {/* Logo */}
       <div className={cn(
@@ -151,6 +132,58 @@ export function AppShell({
       </div>
     </div>
   );
+}
+
+interface AppShellProps {
+  children: React.ReactNode;
+  navItems: NavItem[];
+  homeHref?: string;
+  title?: string;
+}
+
+export function AppShell({
+  children,
+  navItems,
+  homeHref = '/dashboard',
+  title = 'Fore',
+}: AppShellProps) {
+  const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Close mobile menu on route change
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  // Close mobile menu on resize to desktop
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setMobileOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isActive = useCallback((href: string, exact?: boolean) => {
+    if (exact) {
+      return pathname === href;
+    }
+    return pathname.startsWith(href);
+  }, [pathname]);
+
+  const sidebarProps = {
+    collapsed,
+    setCollapsed,
+    setMobileOpen,
+    navItems,
+    homeHref,
+    title,
+    isActive,
+  };
 
   return (
     <div className="flex min-h-screen bg-[#002418]">
@@ -185,7 +218,7 @@ export function AppShell({
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <SidebarContent isMobile />
+        <SidebarContent isMobile {...sidebarProps} />
       </aside>
 
       {/* Desktop Sidebar */}
@@ -195,7 +228,7 @@ export function AppShell({
           collapsed ? 'w-16' : 'w-64'
         )}
       >
-        <SidebarContent />
+        <SidebarContent {...sidebarProps} />
       </aside>
 
       {/* Main Content */}

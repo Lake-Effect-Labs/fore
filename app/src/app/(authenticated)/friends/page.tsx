@@ -54,7 +54,7 @@ export default function FriendsPage() {
       await navigator.clipboard.writeText(inviteLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
+    } catch {
       // Fallback for older browsers
       const textArea = document.createElement('textarea');
       textArea.value = inviteLink;
@@ -77,7 +77,7 @@ export default function FriendsPage() {
     if (navigator.share) {
       try {
         await navigator.share(shareData);
-      } catch (err) {
+      } catch {
         // User cancelled or share failed, fall back to copy
         copyInviteLink();
       }
@@ -261,7 +261,7 @@ export default function FriendsPage() {
         </CardHeader>
         <CardContent>
           <p className="mb-4 text-sm text-[#a8d4c0]">
-            Know someone who isn't on Fore yet? Share your invite link and play together!
+            Know someone who isn&apos;t on Fore yet? Share your invite link and play together!
           </p>
 
           {/* Invite Link */}

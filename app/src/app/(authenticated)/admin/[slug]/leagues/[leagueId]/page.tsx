@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,11 +17,9 @@ import {
   ArrowLeft,
   Trophy,
   Calendar,
-  Clock,
   Users,
   DollarSign,
   Settings,
-  Plus,
   ChevronRight,
   Play,
   Pause,
@@ -296,7 +294,6 @@ export default async function AdminLeagueDetailPage({ params }: PageProps) {
               seasonId={activeSeason.id}
               rounds={rounds}
               facilities={facilities}
-              seasonName={activeSeason.name}
             />
           )}
 
@@ -343,7 +340,7 @@ export default async function AdminLeagueDetailPage({ params }: PageProps) {
                   <Settings className="h-5 w-5 text-[#c9a962]" />
                   <CardTitle className="text-base sm:text-lg">League Settings</CardTitle>
                 </div>
-                <EditLeagueForm league={league} slug={slug} />
+                <EditLeagueForm league={league} />
               </div>
             </CardHeader>
             <CardContent className="p-4 sm:p-6 pt-0 space-y-4">

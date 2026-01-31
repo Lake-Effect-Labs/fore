@@ -58,7 +58,7 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-bold text-[#e8f5f0]">
           Hey, {profile?.display_name || profile?.full_name || 'Golfer'}
         </h1>
-        <p className="text-[#a8d4c0]">Here's what's happening</p>
+        <p className="text-[#a8d4c0]">Here&apos;s what&apos;s happening</p>
       </div>
 
       {/* My Leagues */}
@@ -69,7 +69,7 @@ export default async function DashboardPage() {
             My Leagues
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {leagues.slice(0, 3).map((league: any) => (
+            {leagues.slice(0, 3).map((league) => (
               <Link key={league.id} href={`/leagues/${league.id}`}>
                 <Card className="transition-all hover:border-[#c9a962]">
                   <CardContent className="p-4">
@@ -105,7 +105,7 @@ export default async function DashboardPage() {
             My Upcoming Events
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {upcomingEvents.slice(0, 3).map((event: any) => (
+            {upcomingEvents.slice(0, 3).map((event) => (
               <Link key={event.id} href={`/events/${event.id}`}>
                 <Card className="transition-all hover:border-[#c9a962]">
                   <CardContent className="p-4">

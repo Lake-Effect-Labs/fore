@@ -8,7 +8,7 @@ import {
   getOrganizationEvents,
   getUserRole,
 } from '@/lib/actions';
-import { ArrowLeft, Plus, Calendar, ChevronRight, Users, MapPin } from 'lucide-react';
+import { ArrowLeft, Plus, Calendar, ChevronRight, Users } from 'lucide-react';
 
 interface PageProps {
   params: Promise<{ slug: string }>;

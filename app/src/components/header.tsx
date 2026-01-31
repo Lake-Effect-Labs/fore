@@ -7,7 +7,6 @@ import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
   LayoutDashboard,
-  Plus,
   Users,
   User,
   LogOut,

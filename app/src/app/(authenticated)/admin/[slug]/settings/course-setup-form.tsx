@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,22 @@ interface HoleData {
   notes: string | null;
 }
 
+// Helper function to create initial holes array
+function createInitialHoles(count: 9 | 18): HoleData[] {
+  const newHoles: HoleData[] = [];
+  for (let i = 1; i <= count; i++) {
+    newHoles.push({
+      hole_number: i,
+      par: 4,
+      handicap_index: i,
+      yardage: null,
+      pin_placement: null,
+      notes: null,
+    });
+  }
+  return newHoles;
+}
+
 export function CourseSetupForm({ organizationId }: CourseSetupFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
@@ -39,6 +55,10 @@ export function CourseSetupForm({ organizationId }: CourseSetupFormProps) {
   const [facilityName, setFacilityName] = useState('');
   const [holeCount, setHoleCount] = useState<9 | 18>(18);
   const [holes, setHoles] = useState<HoleData[]>([]);
+
+  const initializeHoles = useCallback((count: 9 | 18) => {
+    setHoles(createInitialHoles(count));
+  }, []);
 
   // Load existing facility and holes
   useEffect(() => {
@@ -70,10 +90,10 @@ export function CourseSetupForm({ organizationId }: CourseSetupFormProps) {
           );
           setShowOptional(hasOptionalData);
         } else {
-          initializeHoles(existingFacility.holes);
+          setHoles(createInitialHoles(existingFacility.holes));
         }
       } else {
-        initializeHoles(18);
+        setHoles(createInitialHoles(18));
       }
 
       setIsLoading(false);
@@ -81,21 +101,6 @@ export function CourseSetupForm({ organizationId }: CourseSetupFormProps) {
 
     loadData();
   }, [organizationId]);
-
-  const initializeHoles = (count: 9 | 18) => {
-    const newHoles: HoleData[] = [];
-    for (let i = 1; i <= count; i++) {
-      newHoles.push({
-        hole_number: i,
-        par: 4,
-        handicap_index: i,
-        yardage: null,
-        pin_placement: null,
-        notes: null,
-      });
-    }
-    setHoles(newHoles);
-  };
 
   const handleHoleCountChange = (count: 9 | 18) => {
     setHoleCount(count);
@@ -151,7 +156,7 @@ export function CourseSetupForm({ organizationId }: CourseSetupFormProps) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       router.refresh();
-    } catch (err) {
+    } catch {
       setError('Failed to save course setup');
     }
 

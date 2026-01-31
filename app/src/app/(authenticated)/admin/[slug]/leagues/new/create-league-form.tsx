@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { createLeague } from '@/lib/actions/leagues';
-import type { LeagueSettings } from '@/types/b2b';
+import type { LeagueSettings, EventFormat } from '@/types/b2b';
 
 interface CreateLeagueFormProps {
   organizationId: string;
@@ -169,7 +169,7 @@ export function CreateLeagueForm({ organizationId, slug }: CreateLeagueFormProps
       name,
       description: description || undefined,
       league_type: leagueType as 'weekly' | 'seasonal' | 'tournament',
-      format: format as any,
+      format: format as EventFormat,
       day_of_week: dayOfWeek ?? undefined,
       start_time: startTime || undefined,
       max_players: maxPlayers ? parseInt(maxPlayers) : undefined,
@@ -440,7 +440,7 @@ export function CreateLeagueForm({ organizationId, slug }: CreateLeagueFormProps
                 </label>
                 <select
                   value={divisionType}
-                  onChange={(e) => setDivisionType(e.target.value as any)}
+                  onChange={(e) => setDivisionType(e.target.value as 'handicap' | 'random' | 'manual')}
                   className="w-full rounded-lg border border-[#004d35] bg-[#002418] px-3 py-2 text-sm text-[#e8f5f0] focus:border-[#c9a962] focus:outline-none"
                 >
                   <option value="handicap">By Handicap</option>

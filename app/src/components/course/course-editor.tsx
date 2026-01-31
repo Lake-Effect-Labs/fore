@@ -3,8 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { bulkUpdateHoles, createTee, bulkUpdateYardages } from '@/lib/actions';
+import { bulkUpdateHoles, createTee } from '@/lib/actions';
 import { Plus, Save, Loader2 } from 'lucide-react';
 import type { Tee, Hole, HoleYardage } from '@/types/b2b';
 

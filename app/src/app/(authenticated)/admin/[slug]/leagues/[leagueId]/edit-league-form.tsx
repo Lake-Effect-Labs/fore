@@ -10,7 +10,6 @@ import { Pencil, X } from 'lucide-react';
 
 interface EditLeagueFormProps {
   league: League;
-  slug: string;
 }
 
 const daysOfWeek = [
@@ -23,7 +22,7 @@ const daysOfWeek = [
   { value: 6, label: 'Saturday' },
 ];
 
-export function EditLeagueForm({ league, slug }: EditLeagueFormProps) {
+export function EditLeagueForm({ league }: EditLeagueFormProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);

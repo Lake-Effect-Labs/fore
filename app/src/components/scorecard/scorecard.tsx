@@ -3,12 +3,11 @@
 import { useState, useCallback, useTransition } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { ScoreInput } from './score-input';
 import { updateScore } from '@/lib/actions';
 import type { GameWithDetails, Score } from '@/types/database';
 import { calculateSkins } from '@/lib/game-logic/skins';
-import { calculateMatchPlay, getMatchPlayHoleDetails } from '@/lib/game-logic/match-play';
+import { calculateMatchPlay } from '@/lib/game-logic/match-play';
 import { getNassauStandings } from '@/lib/game-logic/nassau';
 import { cn } from '@/lib/utils';
 import { Loader2, Trophy, Target } from 'lucide-react';
@@ -23,8 +22,6 @@ export function Scorecard({ game, currentUserId }: ScorecardProps) {
   const [pendingUpdates, setPendingUpdates] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
-
-  const currentPlayer = game.players.find((p) => p.user_id === currentUserId);
 
   // Get score for a specific player and hole
   const getScore = useCallback(
@@ -244,7 +241,7 @@ export function Scorecard({ game, currentUserId }: ScorecardProps) {
                 </tr>
               </thead>
               <tbody>
-                {game.players.map((player, playerIndex) => {
+                {game.players.map((player) => {
                   const isCurrentUser = player.user_id === currentUserId;
                   const frontTotal = getPlayerTotal(player.id, 1, 9);
                   const backTotal = getPlayerTotal(player.id, 10, 18);

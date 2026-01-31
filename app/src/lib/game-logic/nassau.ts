@@ -55,12 +55,12 @@ function calculateHoleByHoleStatus(
 
     // Calculate current leader
     const holesWonValues = Object.entries(holesWon);
-    const maxHolesWon = Math.max(...holesWonValues.map(([_, v]) => v));
-    const leaders = holesWonValues.filter(([_, v]) => v === maxHolesWon);
+    const maxHolesWon = Math.max(...holesWonValues.map(([, v]) => v));
+    const leaders = holesWonValues.filter(([, v]) => v === maxHolesWon);
 
     if (leaders.length === 1 && maxHolesWon > 0) {
       // Find second place
-      const secondPlace = Math.max(...holesWonValues.filter(([id]) => id !== leaders[0][0]).map(([_, v]) => v));
+      const secondPlace = Math.max(...holesWonValues.filter(([id]) => id !== leaders[0][0]).map(([, v]) => v));
       status.push({
         hole,
         leader_id: leaders[0][0],
@@ -168,10 +168,6 @@ export function calculateNassau(
   playerIds: string[],
   holes: 9 | 18
 ): NassauResult {
-  const frontNineBet = config.front_nine_bet || 0;
-  const backNineBet = config.back_nine_bet || 0;
-  const overallBet = config.overall_bet || 0;
-
   // Calculate totals for each player
   const playerTotals: PlayerTotals[] = playerIds.map((playerId) => {
     const playerScores = scores.filter((s) => s.player_id === playerId);

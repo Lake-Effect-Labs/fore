@@ -8,13 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { createRound } from '@/lib/actions/leagues';
 import type { Round, Facility } from '@/types/b2b';
-import { Calendar, Clock, Plus, X, ChevronDown, ChevronUp, MapPin, Zap } from 'lucide-react';
+import { Calendar, Clock, Plus, X, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 
 interface RoundManagementProps {
   seasonId: string;
   rounds: Round[];
   facilities: Facility[];
-  seasonName: string;
 }
 
 const statusColors: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive'> = {
@@ -24,7 +23,7 @@ const statusColors: Record<string, 'default' | 'secondary' | 'success' | 'warnin
   cancelled: 'destructive',
 };
 
-export function RoundManagement({ seasonId, rounds, facilities, seasonName }: RoundManagementProps) {
+export function RoundManagement({ seasonId, rounds, facilities }: RoundManagementProps) {
   const router = useRouter();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showBulkForm, setShowBulkForm] = useState(false);
@@ -109,7 +108,7 @@ export function RoundManagement({ seasonId, rounds, facilities, seasonName }: Ro
     const targetDay = parseInt(bulkDayOfWeek);
     
     // Find the first occurrence of the target day on or after start date
-    let currentDate = new Date(startDate);
+    const currentDate = new Date(startDate);
     const currentDay = currentDate.getDay();
     const daysUntilTarget = (targetDay - currentDay + 7) % 7;
     currentDate.setDate(currentDate.getDate() + daysUntilTarget);

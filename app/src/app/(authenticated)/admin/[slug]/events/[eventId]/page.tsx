@@ -3,13 +3,12 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { getOrganization, getUserRole, getProfile } from '@/lib/actions';
+import { getOrganization, getUserRole } from '@/lib/actions';
 import { getEvent, getEventRegistrations } from '@/lib/actions/events';
 import {
   ArrowLeft,
   Calendar,
   Clock,
-  MapPin,
   Users,
   DollarSign,
   UserCog,

@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
-import { getEvent, getEventRegistrations, getEventLeaderboard, getMyEventRegistration, getProfile, isEventOrganizer } from '@/lib/actions';
+import { getEvent, getEventRegistrations, getEventLeaderboard, getMyEventRegistration, isEventOrganizer } from '@/lib/actions';
 import { RegisterEventButton } from '@/components/event/register-event-button';
-import { ArrowLeft, Trophy, Users, Calendar, MapPin, Clock, Play, Settings } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Calendar, Clock, Play, Settings } from 'lucide-react';
 
 const formatLabels: Record<string, string> = {
   stroke_play: 'Stroke Play',
@@ -37,11 +37,10 @@ export default async function EventDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  const [registrations, leaderboard, myRegistration, profile, isOrganizer] = await Promise.all([
+  const [registrations, leaderboard, myRegistration, isOrganizer] = await Promise.all([
     getEventRegistrations(id),
     getEventLeaderboard(id),
     getMyEventRegistration(id),
-    getProfile(),
     isEventOrganizer(id),
   ]);
 

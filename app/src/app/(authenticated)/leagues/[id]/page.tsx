@@ -2,11 +2,10 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
 import { getLeague, getSeasons, getSeasonParticipants, getSeasonStandings, getSeasonRounds, getProfile } from '@/lib/actions';
 import { JoinLeagueButton } from '@/components/league/join-league-button';
-import { ArrowLeft, Trophy, Users, Calendar, MapPin, Play, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle } from 'lucide-react';
 
 const dayLabels: Record<number, string> = {
   0: 'Sunday',
@@ -303,7 +302,7 @@ export default async function LeagueDetailPage({ params }: PageProps) {
               No Active Season
             </h3>
             <p className="mt-2 text-center text-[#a8d4c0]">
-              This league doesn't have an active season yet. Check back later.
+              This league doesn&apos;t have an active season yet. Check back later.
             </p>
           </CardContent>
         </Card>

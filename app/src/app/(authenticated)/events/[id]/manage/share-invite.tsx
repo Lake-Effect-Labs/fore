@@ -15,7 +15,6 @@ import {
   QrCode,
   Users,
   Send,
-  ExternalLink,
 } from 'lucide-react';
 
 interface ShareInviteProps {

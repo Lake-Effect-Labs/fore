@@ -20,7 +20,6 @@ export function GameResults({ game, currentUserId }: GameResultsProps) {
   const [summaries, setSummaries] = useState<SettlementSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [markingPaid, setMarkingPaid] = useState<string | null>(null);
 
   useEffect(() => {
     getSettlementSummaries(game.id)

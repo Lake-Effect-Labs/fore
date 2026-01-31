@@ -9,13 +9,11 @@ import {
   Calendar,
   Clock,
   MapPin,
-  Users,
   DollarSign,
   AlertCircle,
   CheckCircle,
   ExternalLink,
   Copy,
-  Settings,
   Share2,
   ClipboardCheck,
   ArrowRight,
@@ -360,7 +358,7 @@ export function OverviewTab({
                   {ungroupedCount} {ungroupedCount === 1 ? 'player needs' : 'players need'} group assignment
                 </p>
                 <p className="text-xs text-[#a8d4c0] mt-1">
-                  Assign players to groups so they know who they're playing with.
+                  Assign players to groups so they know who they&apos;re playing with.
                 </p>
               </div>
               <Button variant="outline" size="sm" onClick={() => onTabChange('players')}>

@@ -42,7 +42,7 @@ export function RoundScorecard({
   const [currentHoleIndex, setCurrentHoleIndex] = useState(0);
   const [pendingHoles, setPendingHoles] = useState<Set<number>>(new Set());
   const [showNotes, setShowNotes] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   const currentHole = holes[currentHoleIndex];
   const totalHoles = holes.length;

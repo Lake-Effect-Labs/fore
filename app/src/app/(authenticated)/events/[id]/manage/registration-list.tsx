@@ -10,10 +10,10 @@ import {
   updateRegistrationGroup,
 } from '@/lib/actions/events';
 import type { EventRegistration, PaymentStatus } from '@/types/b2b';
-import { DollarSign, Users, Check, X, Clock, UserX } from 'lucide-react';
+import { Users, Check, X, Clock, UserX } from 'lucide-react';
 
 interface RegistrationListProps {
-  eventId: string;
+  eventId?: string;
   registrations: (EventRegistration & {
     profile: {
       id: string;
@@ -27,7 +27,6 @@ interface RegistrationListProps {
 }
 
 export function RegistrationList({
-  eventId,
   registrations,
   teamSize,
 }: RegistrationListProps) {
